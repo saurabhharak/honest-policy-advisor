@@ -50,12 +50,13 @@ def get_insurer_metrics(name: str | None) -> dict[str, Any] | None:
             return data[canonical]
 
     # Fuzzy ratio match for common short names
-    best_name, best_ratio = None, 0.0
+    best_name: str | None = None
+    best_ratio = 0.0
     for canonical in data:
         ratio = SequenceMatcher(None, query, canonical.lower()).ratio()
         if ratio > best_ratio:
             best_name, best_ratio = canonical, ratio
-    if best_ratio >= 0.75:
+    if best_name is not None and best_ratio >= 0.75:
         return data[best_name]
 
     return None

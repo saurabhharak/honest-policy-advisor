@@ -90,7 +90,7 @@ def parse_json_response(text: str) -> dict[str, Any]:
 class PolicyExtractor:
     """Extracts structured data from insurance policy PDFs via vision model."""
 
-    def __init__(self, llm_client: OpenAI):
+    def __init__(self, llm_client: OpenAI | None):
         self.llm = llm_client
         self.vision_model = get_config().vision_model
 
@@ -100,6 +100,7 @@ class PolicyExtractor:
         Works for both email attachments and Telegram photos — the Caspian
         SDK normalizes both into media URLs.
         """
+        assert self.llm is not None, "extract_from_image requires an LLM client"
         try:
             response = self.llm.chat.completions.create(
                 model=self.vision_model,
@@ -171,6 +172,7 @@ class PolicyExtractor:
 
     def _extract_single(self, media_url: str, prompt: str) -> dict[str, Any]:
         """Call the vision model once for a single page."""
+        assert self.llm is not None, "_extract_single requires an LLM client"
         try:
             response = self.llm.chat.completions.create(
                 model=self.vision_model,

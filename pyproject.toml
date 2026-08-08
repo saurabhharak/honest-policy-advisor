@@ -50,5 +50,15 @@ line-length = 100
 lint.select = ["E", "F", "I", "N", "UP", "B", "SIM"]
 lint.ignore = ["E501"]
 
+[tool.mypy]
+python_version = "3.12"
+strict = false
+warn_unused_ignores = true
+warn_redundant_casts = true
+check_untyped_defs = true
+disallow_untyped_defs = false
+ignore_missing_imports = true
+exclude = ["tests/", "scripts/"]
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/policydecoder"]
