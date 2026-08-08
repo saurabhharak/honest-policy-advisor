@@ -8,7 +8,6 @@ The LLM receives extracted data and calculation results, then decides:
 The LLM never does math. It receives numbers from calculator.py.
 """
 
-import json
 from typing import Any
 
 from openai import OpenAI
@@ -20,6 +19,7 @@ from policydecoder.prompts import (
     CLASSIFY_INTENT_PROMPT,
     COMPLAINT_LETTER_PROMPT,
     FREE_LOOK_LETTER_PROMPT,
+    HEALTH_ANALYSIS_PROMPT,
     OMBUDSMAN_LETTER_PROMPT,
     STATUS_RESPONSE_PROMPT,
     SYSTEM_PROMPT,
@@ -110,6 +110,38 @@ class PolicyAnalyzer:
             "escalation_path": "none",
             "summary": "Analysis could not be completed. Please try again.",
             "key_findings": [],
+        }
+
+    def analyze_health_policy(
+        self,
+        *,
+        extracted_json: str,
+        policy_flags: str,
+        insurer_metrics: str,
+        overall: str,
+    ) -> dict[str, Any]:
+        """Analyze a health policy from pre-computed flags and benchmarks.
+
+        All numbers and flags come from health_calculator.py. The LLM only
+        writes the honest narrative verdict.
+        """
+        prompt = HEALTH_ANALYSIS_PROMPT.format(
+            extracted_json=extracted_json,
+            policy_flags=policy_flags,
+            insurer_metrics=insurer_metrics,
+            overall=overall,
+        )
+        result = self._generate(SYSTEM_PROMPT, prompt, timeout=20.0)
+        parsed = parse_json_response(result)
+        if parsed and "verdict" in parsed:
+            return parsed
+        return {
+            "verdict": overall,
+            "summary": "Analysis could not be completed. Please try again.",
+            "key_findings": [],
+            "red_flags": [],
+            "recommended_action": "unknown",
+            "honest_reassurance": "",
         }
 
     def draft_free_look_letter(

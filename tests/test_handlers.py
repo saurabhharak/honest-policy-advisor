@@ -2,13 +2,23 @@
 
 from unittest.mock import MagicMock
 
-from policydecoder.case_manager import CaseState, case_manager
 from policydecoder.handler import handle
 from tests.conftest import FakeAnalyzer, FakeExtractor, FakeMessage
 
 
 def _make_client():
     return MagicMock()
+
+
+def _health_extractor():
+    """An extractor whose router LLM classifies the doc as HEALTH."""
+    ext = FakeExtractor()
+    # Clear the side_effect from the fixture (side_effect wins over return_value)
+    ext.llm.chat.completions.create.side_effect = None
+    resp = MagicMock()
+    resp.choices[0].message.content = '{"document_type": "HEALTH", "confidence": 0.95}'
+    ext.llm.chat.completions.create.return_value = resp
+    return ext
 
 
 class TestIdleState:
@@ -172,3 +182,66 @@ class TestStatusCheck:
         handle(client, msg2, extractor, analyzer)
 
         assert len(msg2.replies) >= 1
+
+
+class TestHealthMediaHandling:
+    def test_health_photo_returns_health_report(self):
+        client = _make_client()
+        msg = FakeMessage(
+            text="",
+            media=[{"url": "https://example.com/health_policy.jpg"}],
+        )
+        extractor = _health_extractor()
+        analyzer = FakeAnalyzer()
+
+        handle(client, msg, extractor, analyzer)
+
+        assert len(msg.replies) >= 1
+        reply = msg.replies[0]
+        # Health report should mention the extracted policy and honest verdict
+        assert "Care Supreme" in reply
+        assert "honest" in reply.lower() or "fine" in reply.lower()
+
+    def test_health_photo_mentions_benchmark(self):
+        client = _make_client()
+        msg = FakeMessage(
+            text="",
+            media=[{"url": "https://example.com/health_policy.jpg"}],
+        )
+        extractor = _health_extractor()
+        analyzer = FakeAnalyzer()
+
+        handle(client, msg, extractor, analyzer)
+
+        reply = msg.replies[0]
+        assert "IRDAI" in reply
+
+    def test_unreadable_health_photo(self):
+        client = _make_client()
+        msg = FakeMessage(
+            text="",
+            media=[{"url": "https://example.com/blurry_health.jpg"}],
+        )
+        extractor = _health_extractor()
+        extractor.health_data = {}
+        analyzer = FakeAnalyzer()
+
+        handle(client, msg, extractor, analyzer)
+
+        assert "couldn't read" in msg.replies[0].lower()
+
+    def test_life_photo_still_uses_life_path(self):
+        """Existing life behavior must be preserved when router says LIFE."""
+        client = _make_client()
+        msg = FakeMessage(
+            text="",
+            media=[{"url": "https://example.com/policy_photo.jpg"}],
+        )
+        # Default FakeExtractor llm raises → router falls back → LIFE
+        extractor = FakeExtractor()
+        analyzer = FakeAnalyzer()
+
+        handle(client, msg, extractor, analyzer)
+
+        assert len(msg.replies) >= 1
+        assert "LIC Jeevan Anand" in msg.replies[0]

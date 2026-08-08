@@ -1,5 +1,83 @@
 """All prompt templates. Never inline strings in the handler or analyzer."""
 
+DOCUMENT_ROUTER_PROMPT = """Look at this first page of an insurance policy document.
+
+Classify it into exactly one type:
+- HEALTH: health insurance (room rent, co-pay, waiting periods, sum insured, exclusions, hospital network)
+- LIFE: life insurance / ULIP / endowment / money-back / pension (surrender value, benefit illustration, maturity, charges)
+- TERM: pure term insurance (death benefit only, no maturity value, no investment component)
+
+Respond with ONLY a JSON object:
+{
+    "document_type": "HEALTH" | "LIFE" | "TERM" | "UNKNOWN",
+    "confidence": 0.0-1.0
+}
+
+If you cannot tell from the first page, use UNKNOWN with low confidence."""
+
+
+HEALTH_EXTRACTION_PROMPT = """Read this health insurance policy document page carefully.
+
+Extract the following fields and return ONLY a JSON object:
+
+{{
+    "policy_name": "string or null",
+    "insurer": "string or null (e.g. Care Health, HDFC Ergo, Star Health)",
+    "plan_type": "one of: individual, family_floater, senior, topup, super_topup, other, null",
+    "sum_insured": "number or null (e.g. 1000000 for ₹10 lakh)",
+    "annual_premium": "number or null",
+    "room_rent_cap": "string or null (e.g. 'no cap', '₹5,000/day', '2% of SI')",
+    "co_pay_pct": "number or null (percentage)",
+    "sub_limits": ["list of sub-limit clauses, e.g. 'ICU cap ₹1,00,000', 'c-section limit'"],
+    "waiting_periods": {{
+        "accident_days": "number or null",
+        "pre_existing_years": "number or null",
+        "specific_disease_years": "number or null"
+    }},
+    "exclusions": ["list of key exclusions"],
+    "restoration": "one of: unlimited, limited, none, null",
+    "pre_hospitalization_days": "number or null",
+    "post_hospitalization_days": "number or null",
+    "network_hospitals_count": "number or null",
+    "free_look_days": "number or null",
+    "policy_start_date": "string or null (YYYY-MM-DD)"
+}}
+
+If a field is not visible on this page, use null. Do not guess or invent values.
+The accuracy of sum insured and annual premium is critical."""
+
+
+HEALTH_ANALYSIS_PROMPT = """You are reviewing a health insurance policy. All the numbers and flags below were computed deterministically by our analysis engine — do not recompute or second-guess them. Your job is only to write an honest plain-language verdict from these facts.
+
+== EXTRACTED POLICY DATA ==
+{extracted_json}
+
+== DETERMINISTIC POLICY FLAGS ==
+{policy_flags}
+
+== INSURER BENCHMARK (IRDAI FY2024-25) ==
+{insurer_metrics}
+
+== OVERALL VERDICT (computed) ==
+{overall}
+
+== WRITING RULES ==
+1. Be honest. If the policy is genuinely fine (overall = GOOD), say so clearly — do not invent problems.
+2. If there are red flags, explain each one in plain language: what it means, how it could cost the user money.
+3. Compare the insurer against IRDAI benchmarks only where data exists. If a metric is "no data", do not speculate.
+4. End with one clear recommended action: keep the policy, review specific terms, or consider switching.
+
+Respond with ONLY a JSON object:
+{{
+    "verdict": "GOOD" | "REVIEW" | "ALERT",
+    "summary": "2-3 sentence plain-language summary",
+    "key_findings": ["finding1", "finding2", "finding3"],
+    "red_flags": ["flag1", "flag2"],
+    "recommended_action": "one of: keep_policy, review_terms, consider_switching",
+    "honest_reassurance": "what is actually fine about this policy, or empty string"
+}}"""
+
+
 SYSTEM_PROMPT = """You are Policy Decoder — a straightforward insurance analyst who helps people understand their life insurance policies.
 
 You read policy documents, identify mis-sold products, and help people take action. You speak plainly, without jargon. You don't sugarcoat bad news but you're not alarmist either.

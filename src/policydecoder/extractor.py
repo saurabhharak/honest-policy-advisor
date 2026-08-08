@@ -3,6 +3,9 @@
 Sends the policy document (or key pages) to a vision model and gets back
 structured JSON. The vision model reads the document; it doesn't analyze
 or make recommendations — that's analyzer.py's job.
+
+Extraction is routed per document type: health policies use
+HealthPolicyExtraction, life policies use LifePolicyExtraction.
 """
 
 import json
@@ -11,7 +14,11 @@ from typing import Any
 from openai import OpenAI
 
 from policydecoder.config import get_config
-from policydecoder.prompts import POLICY_EXTRACTION_PROMPT
+from policydecoder.prompts import (
+    HEALTH_EXTRACTION_PROMPT,
+    POLICY_EXTRACTION_PROMPT,
+)
+from policydecoder.schemas import HealthPolicyExtraction, LifePolicyExtraction
 
 
 def parse_json_response(text: str) -> dict[str, Any]:
@@ -129,6 +136,65 @@ class PolicyExtractor:
                 if value is not None and not merged.get(key):
                     merged[key] = value
         return merged
+
+    def extract_health(self, media_urls: list[str]) -> dict[str, Any]:
+        """Extract health policy fields using the health schema."""
+        raw = self._extract_pages(media_urls, HEALTH_EXTRACTION_PROMPT)
+        try:
+            return HealthPolicyExtraction.model_validate(raw).model_dump()
+        except Exception as e:
+            print(f"[EXTRACTOR] Health schema validation failed: {e}")
+            return raw
+
+    def extract_life(self, media_urls: list[str]) -> dict[str, Any]:
+        """Extract life policy fields using the life schema."""
+        raw = self._extract_pages(media_urls, POLICY_EXTRACTION_PROMPT)
+        try:
+            return LifePolicyExtraction.model_validate(raw).model_dump()
+        except Exception as e:
+            print(f"[EXTRACTOR] Life schema validation failed: {e}")
+            return raw
+
+    def _extract_pages(
+        self, media_urls: list[str], prompt: str
+    ) -> dict[str, Any]:
+        """Run the vision model over each page and merge results."""
+        if not media_urls:
+            return {}
+        if len(media_urls) == 1:
+            return self._extract_single(media_urls[0], prompt)
+        merged: dict[str, Any] = {}
+        for url in media_urls:
+            result = self._extract_single(url, prompt)
+            for key, value in result.items():
+                if value is not None and not merged.get(key):
+                    merged[key] = value
+        return merged
+
+    def _extract_single(self, media_url: str, prompt: str) -> dict[str, Any]:
+        """Call the vision model once for a single page."""
+        try:
+            response = self.llm.chat.completions.create(
+                model=self.vision_model,
+                messages=[
+                    {
+                        "role": "user",
+                        "content": [
+                            {"type": "text", "text": prompt},
+                            {"type": "image_url", "image_url": {"url": media_url}},
+                        ],
+                    }
+                ],
+                max_tokens=1500,
+                timeout=60,
+            )
+            content = response.choices[0].message.content or ""
+            parsed = parse_json_response(content)
+            if parsed:
+                return parsed
+        except Exception as e:
+            print(f"[EXTRACTOR] Vision extraction failed for {media_url[:60]}: {e}")
+        return {}
 
     def validate_extraction(self, data: dict[str, Any]) -> list[str]:
         """Check if the extracted data has the minimum required fields.

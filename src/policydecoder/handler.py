@@ -4,7 +4,7 @@ Never branches on channel type. The SDK handles routing via message.reply().
 """
 
 import json
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 
 from caspian_sdk import CommClient
 
@@ -21,6 +21,9 @@ from policydecoder.calculator import (
 from policydecoder.case_manager import CaseState, case_manager
 from policydecoder.email_link import build_gmail_compose_url
 from policydecoder.extractor import PolicyExtractor
+from policydecoder.health_calculator import score_health_policy
+from policydecoder.insurer_data import get_insurer_metrics
+from policydecoder.router import HEALTH, classify_document
 
 WELCOME_MESSAGE = """I read insurance policies and tell you if you were mis-sold.
 
@@ -33,7 +36,7 @@ You can send the policy as a photo (Telegram) or PDF attachment (email)."""
 
 
 def _now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()[:19]
+    return datetime.now(UTC).isoformat()[:19]
 
 
 def handle(
@@ -82,7 +85,7 @@ def handle(
 
 
 def _handle_media(client, message, extractor, analyzer, conversation_id, sender):
-    """Process policy document photos/PDFs via vision model."""
+    """Process policy document photos/PDFs — routed by document type."""
     media_urls = [m.get("url") for m in message.media if m.get("url")]
     if not media_urls:
         message.reply("I received an attachment but couldn't read it. Could you try again?")
@@ -91,6 +94,127 @@ def _handle_media(client, message, extractor, analyzer, conversation_id, sender)
     case = case_manager.get_or_create(conversation_id, sender)
     message.typing()
 
+    # Router: classify the document so we extract with the right schema.
+    label, confidence = classify_document(
+        extractor.llm,
+        media_urls,
+        model=extractor.vision_model,
+        fallback_text="",
+    )
+
+    if label == HEALTH:
+        _handle_health_media(message, extractor, analyzer, media_urls, case, confidence)
+    else:
+        _handle_life_media(message, extractor, analyzer, media_urls, case)
+
+
+def _handle_health_media(message, extractor, analyzer, media_urls, case, confidence):
+    """Health policy path: health schema → health calculator → health analysis."""
+    data = extractor.extract_health(media_urls)
+
+    if not data:
+        message.reply(
+            "I couldn't read the health policy document. Could you try:\n"
+            "1. A clearer photo (good lighting, flat surface)\n"
+            "2. The page with the sum insured, premium, and room rent details\n"
+            "3. Or just type the details: sum insured, annual premium, insurer"
+        )
+        return
+
+    # Score against the insurer benchmark
+    insurer_name = data.get("insurer")
+    benchmark = get_insurer_metrics(insurer_name)
+    report = score_health_policy(data, benchmark, {})
+
+    case_manager.update_case(case.case_id, policy_data=data)
+
+    # Let the LLM write the honest verdict from the computed flags
+    analysis = analyzer.analyze_health_policy(
+        extracted_json=json.dumps(data, ensure_ascii=False),
+        policy_flags="\n".join(f"- {f}" for f in report["policy_flags"]) or "None",
+        insurer_metrics=json.dumps(report["insurer_metrics"], ensure_ascii=False),
+        overall=report["overall"],
+    )
+    case_manager.update_case(case.case_id, analysis_result=analysis)
+
+    reply = _format_health_report(data, report, analysis, confidence)
+    message.reply(reply)
+
+
+def _format_health_report(data, report, analysis, confidence) -> str:
+    """Format the health policy report for the user."""
+    parts = ["Here's my honest take on your health policy:\n"]
+
+    # What we extracted
+    summary_bits = []
+    if data.get("policy_name"):
+        summary_bits.append(f"Policy: {data['policy_name']}")
+    if data.get("insurer"):
+        summary_bits.append(f"Insurer: {data['insurer']}")
+    if data.get("sum_insured"):
+        summary_bits.append(f"Sum insured: ₹{data['sum_insured']:,.0f}")
+    if data.get("annual_premium"):
+        summary_bits.append(f"Annual premium: ₹{data['annual_premium']:,.0f}")
+    if summary_bits:
+        parts.append("\n".join(summary_bits))
+
+    # Flags (deterministic)
+    if report["policy_flags"]:
+        parts.append("\nWhat to check:")
+        for flag in report["policy_flags"]:
+            parts.append(f"  ⚠ {flag}")
+    else:
+        parts.append("\nNo major red flags in the policy terms I could extract.")
+
+    # Insurer benchmark
+    bench = report["insurer_metrics"]
+    if bench.get("icr_status") != "no_data":
+        icr = bench.get("icr_value")
+        parts.append(
+            f"\nInsurer track record (IRDAI FY2024-25): "
+            f"{bench['insurer']} — incurred claim ratio {icr:.1f}% "
+            f"({bench['icr_status']})."
+        )
+    else:
+        parts.append("\nNo IRDAI benchmark data found for this insurer yet.")
+
+    # Verdict
+    verdict_emoji = {"GOOD": "✅", "REVIEW": "🟡", "ALERT": "🔴"}.get(
+        report["overall"], "ℹ️"
+    )
+    verdict_line = {
+        "GOOD": "This policy looks genuinely fine on the terms I could check.",
+        "REVIEW": "This policy has a few things worth reviewing before you commit.",
+        "ALERT": "This policy has serious red flags. I'd be cautious here.",
+    }.get(report["overall"], "")
+    parts.append(f"\n{verdict_emoji} {verdict_line}")
+
+    if analysis.get("summary"):
+        parts.append(f"\n{analysis['summary']}")
+
+    if analysis.get("red_flags"):
+        parts.append("\nRed flags:")
+        for flag in analysis["red_flags"]:
+            parts.append(f"  - {flag}")
+
+    if analysis.get("honest_reassurance"):
+        parts.append(f"\nWhat's fine: {analysis['honest_reassurance']}")
+
+    if confidence < 0.6:
+        parts.append(
+            "\nNote: I wasn't fully sure this is a health policy — "
+            "if this is a life policy, let me know and I'll re-check."
+        )
+
+    parts.append(
+        "\nBased on IRDAI FY2024-25 public data. "
+        "This is an honest assessment, not a recommendation to buy or cancel."
+    )
+    return "\n".join(parts)
+
+
+def _handle_life_media(message, extractor, analyzer, media_urls, case):
+    """Life/ULIP/term policy path: the existing life analysis flow."""
     # Extract policy data from the image(s)
     if len(media_urls) == 1:
         data = extractor.extract_from_image(media_urls[0])
@@ -234,7 +358,7 @@ def _run_analysis(client, message, case, analyzer):
         f"Analysis of your {data.get('policy_name', 'policy')}:",
         "",
         f"Your policy returns: {xirr_pct}% per year",
-        f"A term plan + SIP would return: ~11% per year",
+        "A term plan + SIP would return: ~11% per year",
         "",
         f"After {policy_term} years:",
         f"  Your policy gives: {format_inr(maturity_value)}",

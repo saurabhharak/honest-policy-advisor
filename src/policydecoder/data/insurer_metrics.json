@@ -1,0 +1,276 @@
+{
+  "source": "IRDAI Annual Report FY 2024-25 (published Dec 2025), health segment",
+  "notes": "ICR = Incurred Claim Ratio (health incl. personal accident). Healthy band 70-90%. >95% signals financial stress. Null = not published/not collected. Never guess a null.",
+  "insurers": [
+    {
+      "name": "HDFC Ergo General Insurance",
+      "icr_fy25": 84.85,
+      "solvency_ratio": null,
+      "complaints_per_10k_claims": null,
+      "network_hospitals": 13000,
+      "source_url": "https://irdai.gov.in/document-detail?documentId=6436847",
+      "as_of": "2025-12-30"
+    },
+    {
+      "name": "Care Health Insurance",
+      "icr_fy25": 64.53,
+      "solvency_ratio": null,
+      "complaints_per_10k_claims": null,
+      "network_hospitals": 11400,
+      "source_url": "https://irdai.gov.in/document-detail?documentId=6436847",
+      "as_of": "2025-12-30"
+    },
+    {
+      "name": "Star Health and Allied Insurance",
+      "icr_fy25": 70.30,
+      "solvency_ratio": null,
+      "complaints_per_10k_claims": null,
+      "network_hospitals": null,
+      "source_url": "https://irdai.gov.in/document-detail?documentId=6436847",
+      "as_of": "2025-12-30"
+    },
+    {
+      "name": "Niva Bupa Health Insurance",
+      "icr_fy25": 61.22,
+      "solvency_ratio": null,
+      "complaints_per_10k_claims": null,
+      "network_hospitals": 10000,
+      "source_url": "https://irdai.gov.in/document-detail?documentId=6436847",
+      "as_of": "2025-12-30"
+    },
+    {
+      "name": "Aditya Birla Health Insurance",
+      "icr_fy25": 71.50,
+      "solvency_ratio": null,
+      "complaints_per_10k_claims": null,
+      "network_hospitals": 12000,
+      "source_url": "https://irdai.gov.in/document-detail?documentId=6436847",
+      "as_of": "2025-12-30"
+    },
+    {
+      "name": "ManipalCigna Health Insurance",
+      "icr_fy25": 74.81,
+      "solvency_ratio": null,
+      "complaints_per_10k_claims": null,
+      "network_hospitals": null,
+      "source_url": "https://irdai.gov.in/document-detail?documentId=6436847",
+      "as_of": "2025-12-30"
+    },
+    {
+      "name": "ICICI Lombard General Insurance",
+      "icr_fy25": 82.24,
+      "solvency_ratio": null,
+      "complaints_per_10k_claims": null,
+      "network_hospitals": null,
+      "source_url": "https://irdai.gov.in/document-detail?documentId=6436847",
+      "as_of": "2025-12-30"
+    },
+    {
+      "name": "Bajaj Allianz General Insurance",
+      "icr_fy25": 87.31,
+      "solvency_ratio": null,
+      "complaints_per_10k_claims": null,
+      "network_hospitals": null,
+      "source_url": "https://irdai.gov.in/document-detail?documentId=6436847",
+      "as_of": "2025-12-30"
+    },
+    {
+      "name": "Tata AIG General Insurance",
+      "icr_fy25": 76.24,
+      "solvency_ratio": null,
+      "complaints_per_10k_claims": null,
+      "network_hospitals": null,
+      "source_url": "https://irdai.gov.in/document-detail?documentId=6436847",
+      "as_of": "2025-12-30"
+    },
+    {
+      "name": "SBI General Insurance",
+      "icr_fy25": 82.19,
+      "solvency_ratio": null,
+      "complaints_per_10k_claims": null,
+      "network_hospitals": 16600,
+      "source_url": "https://irdai.gov.in/document-detail?documentId=6436847",
+      "as_of": "2025-12-30"
+    },
+    {
+      "name": "Go Digit General Insurance",
+      "icr_fy25": 83.78,
+      "solvency_ratio": null,
+      "complaints_per_10k_claims": null,
+      "network_hospitals": null,
+      "source_url": "https://irdai.gov.in/document-detail?documentId=6436847",
+      "as_of": "2025-12-30"
+    },
+    {
+      "name": "Acko General Insurance",
+      "icr_fy25": 57.82,
+      "solvency_ratio": null,
+      "complaints_per_10k_claims": null,
+      "network_hospitals": null,
+      "source_url": "https://irdai.gov.in/document-detail?documentId=6436847",
+      "as_of": "2025-12-30"
+    },
+    {
+      "name": "Cholamandalam MS General Insurance",
+      "icr_fy25": 73.04,
+      "solvency_ratio": null,
+      "complaints_per_10k_claims": null,
+      "network_hospitals": null,
+      "source_url": "https://irdai.gov.in/document-detail?documentId=6436847",
+      "as_of": "2025-12-30"
+    },
+    {
+      "name": "Future Generali India Insurance",
+      "icr_fy25": 95.29,
+      "solvency_ratio": null,
+      "complaints_per_10k_claims": null,
+      "network_hospitals": null,
+      "source_url": "https://irdai.gov.in/document-detail?documentId=6436847",
+      "as_of": "2025-12-30"
+    },
+    {
+      "name": "IFFCO Tokio General Insurance",
+      "icr_fy25": 83.74,
+      "solvency_ratio": null,
+      "complaints_per_10k_claims": null,
+      "network_hospitals": null,
+      "source_url": "https://irdai.gov.in/document-detail?documentId=6436847",
+      "as_of": "2025-12-30"
+    },
+    {
+      "name": "Kshema General Insurance",
+      "icr_fy25": 40.03,
+      "solvency_ratio": null,
+      "complaints_per_10k_claims": null,
+      "network_hospitals": null,
+      "source_url": "https://irdai.gov.in/document-detail?documentId=6436847",
+      "as_of": "2025-12-30"
+    },
+    {
+      "name": "Liberty General Insurance",
+      "icr_fy25": 92.99,
+      "solvency_ratio": null,
+      "complaints_per_10k_claims": null,
+      "network_hospitals": null,
+      "source_url": "https://irdai.gov.in/document-detail?documentId=6436847",
+      "as_of": "2025-12-30"
+    },
+    {
+      "name": "Magma General Insurance",
+      "icr_fy25": 85.54,
+      "solvency_ratio": null,
+      "complaints_per_10k_claims": null,
+      "network_hospitals": null,
+      "source_url": "https://irdai.gov.in/document-detail?documentId=6436847",
+      "as_of": "2025-12-30"
+    },
+    {
+      "name": "Navi General Insurance",
+      "icr_fy25": 101.89,
+      "solvency_ratio": null,
+      "complaints_per_10k_claims": null,
+      "network_hospitals": null,
+      "source_url": "https://irdai.gov.in/document-detail?documentId=6436847",
+      "as_of": "2025-12-30"
+    },
+    {
+      "name": "Raheja QBE General Insurance",
+      "icr_fy25": 105.12,
+      "solvency_ratio": null,
+      "complaints_per_10k_claims": null,
+      "network_hospitals": null,
+      "source_url": "https://irdai.gov.in/document-detail?documentId=6436847",
+      "as_of": "2025-12-30"
+    },
+    {
+      "name": "Reliance General Insurance",
+      "icr_fy25": 87.34,
+      "solvency_ratio": null,
+      "complaints_per_10k_claims": null,
+      "network_hospitals": null,
+      "source_url": "https://irdai.gov.in/document-detail?documentId=6436847",
+      "as_of": "2025-12-30"
+    },
+    {
+      "name": "Royal Sundaram General Insurance",
+      "icr_fy25": 95.56,
+      "solvency_ratio": null,
+      "complaints_per_10k_claims": null,
+      "network_hospitals": null,
+      "source_url": "https://irdai.gov.in/document-detail?documentId=6436847",
+      "as_of": "2025-12-30"
+    },
+    {
+      "name": "Shriram General Insurance",
+      "icr_fy25": 74.55,
+      "solvency_ratio": null,
+      "complaints_per_10k_claims": null,
+      "network_hospitals": null,
+      "source_url": "https://irdai.gov.in/document-detail?documentId=6436847",
+      "as_of": "2025-12-30"
+    },
+    {
+      "name": "Universal Sompo General Insurance",
+      "icr_fy25": 97.12,
+      "solvency_ratio": null,
+      "complaints_per_10k_claims": null,
+      "network_hospitals": null,
+      "source_url": "https://irdai.gov.in/document-detail?documentId=6436847",
+      "as_of": "2025-12-30"
+    },
+    {
+      "name": "Zuno General Insurance",
+      "icr_fy25": 90.12,
+      "solvency_ratio": null,
+      "complaints_per_10k_claims": null,
+      "network_hospitals": null,
+      "source_url": "https://irdai.gov.in/document-detail?documentId=6436847",
+      "as_of": "2025-12-30"
+    },
+    {
+      "name": "Zurich Kotak General Insurance",
+      "icr_fy25": 70.69,
+      "solvency_ratio": null,
+      "complaints_per_10k_claims": null,
+      "network_hospitals": null,
+      "source_url": "https://irdai.gov.in/document-detail?documentId=6436847",
+      "as_of": "2025-12-30"
+    },
+    {
+      "name": "National Insurance",
+      "icr_fy25": 96.05,
+      "solvency_ratio": null,
+      "complaints_per_10k_claims": null,
+      "network_hospitals": null,
+      "source_url": "https://irdai.gov.in/document-detail?documentId=6436847",
+      "as_of": "2025-12-30"
+    },
+    {
+      "name": "New India Assurance",
+      "icr_fy25": 100.98,
+      "solvency_ratio": null,
+      "complaints_per_10k_claims": null,
+      "network_hospitals": null,
+      "source_url": "https://irdai.gov.in/document-detail?documentId=6436847",
+      "as_of": "2025-12-30"
+    },
+    {
+      "name": "Oriental Insurance",
+      "icr_fy25": 102.58,
+      "solvency_ratio": null,
+      "complaints_per_10k_claims": null,
+      "network_hospitals": null,
+      "source_url": "https://irdai.gov.in/document-detail?documentId=6436847",
+      "as_of": "2025-12-30"
+    },
+    {
+      "name": "United India Insurance",
+      "icr_fy25": 97.51,
+      "solvency_ratio": null,
+      "complaints_per_10k_claims": null,
+      "network_hospitals": null,
+      "source_url": "https://irdai.gov.in/document-detail?documentId=6436847",
+      "as_of": "2025-12-30"
+    }
+  ]
+}

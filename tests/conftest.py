@@ -1,9 +1,10 @@
 """Test doubles. No real LLM, no real channels, no real timers."""
 
-import pytest
 from unittest.mock import MagicMock
 
-from policydecoder.case_manager import case_manager, CaseState
+import pytest
+
+from policydecoder.case_manager import case_manager
 
 
 @pytest.fixture(autouse=True)
@@ -37,7 +38,7 @@ class FakeMessage:
 class FakeExtractor:
     """Returns canned extraction results. No real vision model."""
 
-    def __init__(self, canned_data=None):
+    def __init__(self, canned_data=None, health_data=None):
         if canned_data is not None:
             self.canned_data = canned_data
         else:
@@ -53,11 +54,42 @@ class FakeExtractor:
             "maturity_value_at_4pct": 780000,
             "free_look_period_days": 15,
         }
+        if health_data is not None:
+            self.health_data = health_data
+        else:
+            self.health_data = {
+                "policy_name": "Care Supreme",
+                "insurer": "HDFC Ergo General Insurance",
+                "plan_type": "individual",
+                "sum_insured": 1500000,
+                "annual_premium": 18000,
+                "room_rent_cap": "no cap",
+                "co_pay_pct": 10,
+                "waiting_periods": {
+                    "accident_days": 30,
+                    "pre_existing_years": 3,
+                    "specific_disease_years": 2,
+                },
+                "sub_limits": [],
+                "exclusions": [],
+                "restoration": "unlimited",
+                "network_hospitals_count": 13000,
+            }
+        # For the router: expose an llm that raises (falls back to heuristic)
+        self.llm = MagicMock()
+        self.llm.chat.completions.create.side_effect = Exception("no llm in tests")
+        self.vision_model = "fake-vision"
 
     def extract_from_image(self, url):
         return self.canned_data
 
     def extract_from_images(self, urls):
+        return self.canned_data
+
+    def extract_health(self, urls):
+        return self.health_data
+
+    def extract_life(self, urls):
         return self.canned_data
 
     def validate_extraction(self, data):
@@ -68,7 +100,7 @@ class FakeExtractor:
 class FakeAnalyzer:
     """Returns canned analysis results. No real LLM."""
 
-    def __init__(self, canned_analysis=None):
+    def __init__(self, canned_analysis=None, health_analysis=None):
         self.canned_analysis = canned_analysis or {
             "is_likely_missold": True,
             "misselling_reasons": [
@@ -82,6 +114,14 @@ class FakeAnalyzer:
                 "XIRR of 3.8% is below savings account rates",
                 "Premium allocation charge of 4.2% in year 1",
             ],
+        }
+        self.health_analysis = health_analysis or {
+            "verdict": "GOOD",
+            "summary": "This health policy has strong terms and a solid insurer track record.",
+            "key_findings": ["No room rent cap", "Unlimited restoration"],
+            "red_flags": [],
+            "recommended_action": "keep_policy",
+            "honest_reassurance": "The room rent is uncapped and the insurer settles claims well.",
         }
 
     def classify_intent(self, message_text, case_state, case_summary):
@@ -101,6 +141,9 @@ class FakeAnalyzer:
 
     def analyze_policy(self, **kwargs):
         return self.canned_analysis
+
+    def analyze_health_policy(self, **kwargs):
+        return self.health_analysis
 
     def draft_free_look_letter(self, **kwargs):
         return "Dear Sir/Madam,\n\nI wish to cancel my policy under the free-look period..."
