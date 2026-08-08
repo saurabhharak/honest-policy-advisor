@@ -7,8 +7,13 @@ every function is a no-op with zero latency and Opik is never imported.
 
 The 4 LLM choke points instrumented are: extractor (vision), analyzer
 (_generate), router (classify), guardrails (rail check).
+
+Structure: the handler starts one Trace per incoming message
+(start_trace), and each LLM call site logs a child Span under it
+(trace_llm). This gives a per-message tree in Opik.
 """
 
+import time
 from collections.abc import Callable
 from typing import Any
 
@@ -17,10 +22,33 @@ from policydecoder.logging import get_correlation_id, get_logger
 
 logger = get_logger("policydecoder.opik")
 
+_CURRENT_TRACE_ID: str | None = None
+_CURRENT_TRACE_START: float | None = None
+_CLIENT = None
+
 
 def is_enabled() -> bool:
     """Whether Opik tracing is active (OPIK_ENABLED=true)."""
     return get_config().opik_enabled
+
+
+def start_trace(correlation_id: str, channel: str) -> None:
+    """Start a per-message Opik trace. Child LLM spans nest under it."""
+    global _CURRENT_TRACE_ID, _CURRENT_TRACE_START
+    if not is_enabled():
+        return
+    try:
+        client = _get_client()
+        trace = client.trace(
+            name="policy_message",
+            input={"correlation_id": correlation_id, "channel": channel},
+            metadata={"correlation_id": correlation_id, "channel": channel},
+            tags=["policydecoder"],
+        )
+        _CURRENT_TRACE_ID = trace.id
+        _CURRENT_TRACE_START = time.time()
+    except Exception as e:  # tracing must never break the app
+        logger.warning("Opik start_trace failed: %s", e)
 
 
 def trace_llm(
@@ -31,7 +59,7 @@ def trace_llm(
     output_text: str,
     metadata: dict[str, Any] | None = None,
 ) -> None:
-    """Record one LLM call as an Opik trace/span. No-op when disabled."""
+    """Record one LLM call as an Opik span under the current trace."""
     if not is_enabled():
         return
     try:
@@ -60,18 +88,18 @@ def _track(
     meta.setdefault("correlation_id", get_correlation_id())
 
     client = _get_client()
-    with client.span(
+    span_kwargs: dict[str, Any] = dict(
         name=name,
         type="llm",
         input={"input": input_text},
         output={"output": output_text},
         metadata=meta,
         tags=["policydecoder"],
-    ):
-        pass
-
-
-_CLIENT = None
+        model=model,
+    )
+    if _CURRENT_TRACE_ID:
+        span_kwargs["trace_id"] = _CURRENT_TRACE_ID
+    client.span(**span_kwargs)
 
 
 def _get_client():
@@ -119,17 +147,5 @@ def flush() -> None:
 
 
 def set_trace_metadata(correlation_id: str, channel: str) -> None:
-    """Attach correlation ID + channel to the current trace context."""
-    if not is_enabled():
-        return
-    try:
-        from opik.opik_context import update_current_trace
-
-        update_current_trace(
-            name="policy_message",
-            metadata={"correlation_id": correlation_id, "channel": channel},
-        )
-    except ImportError:
-        pass
-    except Exception as e:
-        logger.warning("Opik set_trace_metadata failed: %s", e)
+    """Start the per-message trace (kept for the handler call site)."""
+    start_trace(correlation_id, channel)

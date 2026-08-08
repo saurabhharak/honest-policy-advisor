@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from policydecoder import guardrails
+from policydecoder import guardrails, opik_tracing
 from policydecoder.case_manager import case_manager
 
 
@@ -28,6 +28,20 @@ def guardrails_off():
     """
     with patch.object(guardrails, "is_enabled", return_value=False):
         yield
+
+
+@pytest.fixture(autouse=True)
+def opik_off():
+    """Force Opik tracing off for every test by default.
+
+    Tracing makes network calls to the configured Opik instance. Tests
+    must never send traces unless they explicitly patch is_enabled or
+    mock the client.
+    """
+    opik_tracing._CURRENT_TRACE_ID = None
+    with patch.object(opik_tracing, "is_enabled", return_value=False):
+        yield
+    opik_tracing._CURRENT_TRACE_ID = None
 
 
 class FakeMessage:
