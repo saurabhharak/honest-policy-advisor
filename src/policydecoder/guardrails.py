@@ -27,6 +27,10 @@ import asyncio
 from typing import Any
 
 from policydecoder.config import get_config
+from policydecoder.logging import get_logger
+from policydecoder.opik_tracing import trace_llm
+
+logger = get_logger("policydecoder.guardrails")
 
 # High-risk free-text fields extracted from policy documents. These are the
 # fields where an attacker could embed instructions that survive extraction.
@@ -288,11 +292,27 @@ def _generate_rails_check(text: str, context: str) -> str:
         result = rails.generate(messages=[{"role": "user", "content": text}])
     else:
         result = _run_async(rails.generate_async(messages=[{"role": "user", "content": text}]))
-    return _response_content(result)
+    content = _response_content(result)
+    trace_llm(
+        "guardrail_check",
+        model="nemoguardrails",
+        input_text=text[:500],
+        output_text=content[:200],
+        metadata={"context": context, "blocked": _is_blocked_response(content)},
+    )
+    return content
 
 
 async def _generate_rails_check_async(text: str, context: str) -> str:
     """Async NeMo generation wrapper. Returns assistant response content."""
     rails = _get_rails()
     result = await rails.generate_async(messages=[{"role": "user", "content": text}])
-    return _response_content(result)
+    content = _response_content(result)
+    trace_llm(
+        "guardrail_check",
+        model="nemoguardrails",
+        input_text=text[:500],
+        output_text=content[:200],
+        metadata={"context": context, "blocked": _is_blocked_response(content)},
+    )
+    return content

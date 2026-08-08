@@ -31,6 +31,9 @@ class Config:
     agent_username: str
     guardrails_enabled: bool
     guardrails_model: str
+    opik_enabled: bool
+    opik_url: str
+    opik_api_key: str
 
 
 _config: Config | None = None
@@ -52,5 +55,8 @@ def get_config() -> Config:
             guardrails_enabled=os.getenv("GUARDRAILS_ENABLED", "").strip().lower()
             in ("1", "true", "yes"),
             guardrails_model=_optional("GUARDRAILS_MODEL", llm_model),
+            opik_enabled=os.getenv("OPIK_ENABLED", "").strip().lower() in ("1", "true", "yes"),
+            opik_url=_optional("OPIK_URL", ""),
+            opik_api_key=_optional("OPIK_API_KEY", ""),
         )
     return _config

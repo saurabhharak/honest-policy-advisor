@@ -28,7 +28,11 @@ from policydecoder.guardrails import (
 )
 from policydecoder.health_calculator import score_health_policy
 from policydecoder.insurer_data import get_insurer_metrics
+from policydecoder.logging import get_logger, set_correlation_id
+from policydecoder.opik_tracing import flush, set_trace_metadata
 from policydecoder.router import HEALTH, classify_document
+
+logger = get_logger("policydecoder.handler")
 
 WELCOME_MESSAGE = """I read insurance policies and tell you if you were mis-sold.
 
@@ -56,6 +60,17 @@ def handle(
     text = (message.text or "").strip()
     media = getattr(message, "media", []) or []
 
+    # Observability: correlate all logs + traces for this message.
+    set_correlation_id(conversation_id)
+    set_trace_metadata(conversation_id, channel="unknown")
+    try:
+        _handle_inner(client, message, extractor, analyzer, conversation_id, sender, text, media)
+    finally:
+        flush()
+
+
+def _handle_inner(client, message, extractor, analyzer, conversation_id, sender, text, media):
+    """The body of handle(), wrapped so traces flush on every exit path."""
     # Media (policy PDF photo) takes priority
     if media:
         _handle_media(client, message, extractor, analyzer, conversation_id, sender)

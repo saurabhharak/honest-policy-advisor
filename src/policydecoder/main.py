@@ -18,9 +18,13 @@ from policydecoder.case_manager import case_manager
 from policydecoder.config import get_config
 from policydecoder.extractor import PolicyExtractor
 from policydecoder.handler import handle
+from policydecoder.logging import configure_logging, get_logger
+
+logger = get_logger("policydecoder.main")
 
 
 def run() -> None:
+    configure_logging()
     config = get_config()
 
     client = CommClient(
@@ -31,13 +35,14 @@ def run() -> None:
     email_conn = client.connect_email(username=config.agent_username)
     telegram_conn = client.connect_telegram(bot_token=config.telegram_bot_token)
 
-    print("Policy Decoder ONLINE")
-    print(f"  Email:    {email_conn['address']}")
-    print(f"  Telegram: @{telegram_conn['address']}")
-    print(f"  LLM:      {config.llm_model}")
-    print(f"  Vision:   {config.vision_model}")
-    print(f"  Started:  {datetime.now(UTC).isoformat()[:19]}Z")
-    print()
+    logger.info("Policy Decoder ONLINE")
+    logger.info("  Email:    %s", email_conn["address"])
+    logger.info("  Telegram: @%s", telegram_conn["address"])
+    logger.info("  LLM:      %s", config.llm_model)
+    logger.info("  Vision:   %s", config.vision_model)
+    logger.info("  Started:  %sZ", datetime.now(UTC).isoformat()[:19])
+    logger.info("  Guardrails: %s", "enabled" if config.guardrails_enabled else "off")
+    logger.info("  Opik:     %s", "enabled" if config.opik_enabled else "off")
 
     llm = OpenAI(
         api_key=config.openai_api_key,
@@ -50,8 +55,7 @@ def run() -> None:
 
     store = Persistence()
     case_manager.load_all_from(store)
-    print(f"  Persistence: {store.db_path}")
-    print()
+    logger.info("  Persistence: %s", store.db_path)
 
     @client.on_message
     def on_message(message):

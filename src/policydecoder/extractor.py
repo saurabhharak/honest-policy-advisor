@@ -14,6 +14,8 @@ from typing import Any
 from openai import OpenAI
 
 from policydecoder.config import get_config
+from policydecoder.logging import get_logger
+from policydecoder.opik_tracing import trace_llm
 from policydecoder.prompts import (
     HEALTH_EXTRACTION_PROMPT,
     POLICY_EXTRACTION_PROMPT,
@@ -93,6 +95,7 @@ class PolicyExtractor:
     def __init__(self, llm_client: OpenAI | None):
         self.llm = llm_client
         self.vision_model = get_config().vision_model
+        self.logger = get_logger("policydecoder.extractor")
 
     def extract_from_image(self, media_url: str) -> dict[str, Any]:
         """Extract policy details from a photo of the policy document.
@@ -119,9 +122,16 @@ class PolicyExtractor:
             content = response.choices[0].message.content or ""
             parsed = parse_json_response(content)
             if parsed:
+                trace_llm(
+                    "extract_vision",
+                    model=self.vision_model,
+                    input_text=f"media={media_url[:80]}",
+                    output_text=content[:500],
+                    metadata={"media_url": media_url[:80]},
+                )
                 return parsed
         except Exception as e:
-            print(f"[EXTRACTOR] Vision extraction failed for {media_url[:60]}: {e}")
+            self.logger.warning("Vision extraction failed for %s: %s", media_url[:60], e)
         return {}
 
     def extract_from_images(self, media_urls: list[str]) -> dict[str, Any]:
@@ -191,9 +201,16 @@ class PolicyExtractor:
             content = response.choices[0].message.content or ""
             parsed = parse_json_response(content)
             if parsed:
+                trace_llm(
+                    "extract_vision_page",
+                    model=self.vision_model,
+                    input_text=f"media={media_url[:80]}",
+                    output_text=content[:500],
+                    metadata={"media_url": media_url[:80]},
+                )
                 return parsed
         except Exception as e:
-            print(f"[EXTRACTOR] Vision extraction failed for {media_url[:60]}: {e}")
+            self.logger.warning("Vision extraction failed for %s: %s", media_url[:60], e)
         return {}
 
     def validate_extraction(self, data: dict[str, Any]) -> list[str]:

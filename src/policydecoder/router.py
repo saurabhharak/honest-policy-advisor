@@ -13,7 +13,11 @@ router never breaks the existing flow.
 
 from typing import Any
 
+from policydecoder.logging import get_logger
+from policydecoder.opik_tracing import trace_llm
 from policydecoder.prompts import DOCUMENT_ROUTER_PROMPT
+
+logger = get_logger("policydecoder.router")
 
 # Document type labels
 HEALTH = "HEALTH"
@@ -141,9 +145,17 @@ def _llm_classify(llm_client, media_urls: list[str], model: str) -> tuple[str, f
             timeout=15,
         )
         content = response.choices[0].message.content or ""
-        return _parse_router_response(content)
+        label, confidence = _parse_router_response(content)
+        trace_llm(
+            "router_classify",
+            model=model,
+            input_text=f"media={media_urls[0][:80]}",
+            output_text=f"{label} ({confidence:.2f})",
+            metadata={"media_url": media_urls[0][:80]},
+        )
+        return label, confidence
     except Exception as e:
-        print(f"[ROUTER] LLM classify failed: {e}")
+        logger.warning("LLM classify failed: %s", e)
         return UNKNOWN, 0.0
 
 

@@ -9,6 +9,10 @@ from datetime import UTC, datetime
 from enum import Enum
 from typing import Any
 
+from policydecoder.logging import get_logger
+
+logger = get_logger("policydecoder.case_manager")
+
 
 class CaseState(Enum):
     IDLE = "IDLE"
@@ -87,7 +91,7 @@ class CaseManager:
                 try:
                     self._store.save(case)
                 except Exception as e:
-                    print(f"[CASE_MANAGER] Persist failed for {case_id}: {e}")
+                    logger.warning("Persist failed for %s: %s", case_id, e)
 
     def get(self, case_id: str) -> Case | None:
         return self._cases.get(case_id)
@@ -186,5 +190,4 @@ case_manager = CaseManager()
 
 
 def _log_action(case_id: str, action: str, detail: str) -> None:
-    ts = datetime.now(UTC).isoformat()[:26]
-    print(f"[{ts}] CASE:{case_id[:12]} ACTION:{action} {detail}")
+    logger.info("CASE:%s ACTION:%s %s", case_id[:12], action, detail)

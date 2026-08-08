@@ -6,6 +6,7 @@ import policydecoder.handler as handler
 from policydecoder import guardrails
 from policydecoder.guardrails import GuardrailValidationError
 from policydecoder.handler import handle
+from policydecoder.logging import get_correlation_id
 from tests.conftest import FakeAnalyzer, FakeExtractor, FakeMessage
 
 
@@ -310,3 +311,17 @@ class TestGuardrailBlocks:
             handle(client, msg, extractor, analyzer)
 
         assert len(msg.replies) >= 1
+
+
+class TestCorrelationId:
+    def test_handler_sets_correlation_id(self):
+        """The handler sets the conversation ID as the correlation ID."""
+        client = _make_client()
+        msg = FakeMessage(text="What is a room rent cap?", conversation_id="conv-xyz")
+        extractor = FakeExtractor()
+        analyzer = FakeAnalyzer()
+
+        with patch.object(guardrails, "is_enabled", return_value=False):
+            handle(client, msg, extractor, analyzer)
+
+        assert get_correlation_id() == "conv-xyz"

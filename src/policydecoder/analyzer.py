@@ -15,6 +15,8 @@ from openai import OpenAI
 from policydecoder.config import get_config
 from policydecoder.extractor import parse_json_response
 from policydecoder.guardrails import validate_letter_output
+from policydecoder.logging import get_logger
+from policydecoder.opik_tracing import trace_llm
 from policydecoder.prompts import (
     ANALYSIS_PROMPT,
     CLASSIFY_INTENT_PROMPT,
@@ -33,6 +35,7 @@ class PolicyAnalyzer:
     def __init__(self, llm_client: OpenAI):
         self.llm = llm_client
         self.model = get_config().llm_model
+        self.logger = get_logger("policydecoder.analyzer")
 
     def _generate(self, system: str, user: str, timeout: float = 15.0) -> str:
         try:
@@ -47,9 +50,17 @@ class PolicyAnalyzer:
                 timeout=timeout,
             )
             content = response.choices[0].message.content
-            return content.strip() if content else ""
+            result = content.strip() if content else ""
+            trace_llm(
+                "analyzer_generate",
+                model=self.model,
+                input_text=user[:500],
+                output_text=result[:500],
+                metadata={"timeout": timeout},
+            )
+            return result
         except Exception as e:
-            print(f"[ANALYZER] LLM call failed: {e}")
+            self.logger.warning("LLM call failed: %s", e)
             return ""
 
     def _generate_letter(self, system: str, prompt: str) -> str:

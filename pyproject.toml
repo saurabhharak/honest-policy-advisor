@@ -36,6 +36,9 @@ dev = [
 guardrails = [
     "nemoguardrails>=0.10.0",
 ]
+observability = [
+    "opik>=1.0.0",
+]
 
 [project.scripts]
 policydecoder = "policydecoder.main:run"
