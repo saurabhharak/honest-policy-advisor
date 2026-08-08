@@ -43,17 +43,17 @@ class FakeExtractor:
             self.canned_data = canned_data
         else:
             self.canned_data = {
-            "policy_name": "LIC Jeevan Anand",
-            "policy_type": "endowment",
-            "insurer": "LIC",
-            "annual_premium": 50000,
-            "premium_term_years": 15,
-            "policy_term_years": 15,
-            "sum_assured": 1000000,
-            "maturity_value_at_8pct": 1120000,
-            "maturity_value_at_4pct": 780000,
-            "free_look_period_days": 15,
-        }
+                "policy_name": "LIC Jeevan Anand",
+                "policy_type": "endowment",
+                "insurer": "LIC",
+                "annual_premium": 50000,
+                "premium_term_years": 15,
+                "policy_term_years": 15,
+                "sum_assured": 1000000,
+                "maturity_value_at_8pct": 1120000,
+                "maturity_value_at_4pct": 780000,
+                "free_look_period_days": 15,
+            }
         if health_data is not None:
             self.health_data = health_data
         else:

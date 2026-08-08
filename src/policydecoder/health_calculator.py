@@ -30,9 +30,7 @@ class HealthScoreReport(dict):
     """A dict subclass so callers get dict ergonomics with type hints."""
 
 
-def room_rent_cap_assessment(
-    sum_insured: float | None, room_rent_cap: str | None
-) -> str | None:
+def room_rent_cap_assessment(sum_insured: float | None, room_rent_cap: str | None) -> str | None:
     """Flag restrictive room rent caps.
 
     A per-day cap below ~₹3,000 essentially confines you to a shared ward,
@@ -114,13 +112,12 @@ def sub_limit_assessment(sub_limits: list[str] | None) -> str | None:
     """Flag sub-limits on common high-cost procedures."""
     if not sub_limits:
         return None
-    hits = [
-        s for s in sub_limits if any(k in s.lower() for k in _HIDDEN_SUBLIMIT_KEYWORDS)
-    ]
+    hits = [s for s in sub_limits if any(k in s.lower() for k in _HIDDEN_SUBLIMIT_KEYWORDS)]
     if hits:
         return (
-            "Sub-limits on common procedures: " + ", ".join(hits) +
-            ". These cap payouts on the treatments most families actually claim."
+            "Sub-limits on common procedures: "
+            + ", ".join(hits)
+            + ". These cap payouts on the treatments most families actually claim."
         )
     return None
 
@@ -253,9 +250,7 @@ def score_health_policy(
 
     flags: list[str] = []
     for check in (
-        room_rent_cap_assessment(
-            extraction.get("sum_insured"), extraction.get("room_rent_cap")
-        ),
+        room_rent_cap_assessment(extraction.get("sum_insured"), extraction.get("room_rent_cap")),
         co_pay_assessment(extraction.get("co_pay_pct")),
         waiting_period_assessment(extraction.get("waiting_periods")),
         sub_limit_assessment(extraction.get("sub_limits")),

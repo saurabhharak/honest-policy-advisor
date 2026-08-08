@@ -120,9 +120,7 @@ def classify_document(
     return DEFAULT_LABEL, 0.0
 
 
-def _llm_classify(
-    llm_client, media_urls: list[str], model: str
-) -> tuple[str, float]:
+def _llm_classify(llm_client, media_urls: list[str], model: str) -> tuple[str, float]:
     """Ask the cheap model to classify the first page. Best-effort."""
     try:
         response = llm_client.chat.completions.create(

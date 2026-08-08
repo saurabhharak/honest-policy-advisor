@@ -18,7 +18,7 @@ def _to_float(v: Any) -> float | None:
     """Coerce '₹50,000', '5,00,000', '10 lakh' etc. to a number."""
     if v is None or v == "":
         return None
-    if isinstance(v, (int, float)):
+    if isinstance(v, int | float):
         return float(v)
     s = str(v).strip().replace(",", "").replace("₹", "").replace(" ", "")
     # Handle lakh/crore words
@@ -78,9 +78,7 @@ class HealthPolicyExtraction(BaseModel):
     free_look_days: int | None = None
     policy_start_date: str | None = None
 
-    @field_validator(
-        "sum_insured", "annual_premium", "co_pay_pct", mode="before"
-    )
+    @field_validator("sum_insured", "annual_premium", "co_pay_pct", mode="before")
     @classmethod
     def _coerce_numbers(cls, v: Any) -> Any:
         if isinstance(v, str):
@@ -113,9 +111,9 @@ class LifePolicyExtraction(BaseModel):
     model_config = ConfigDict(use_enum_values=True)
 
     policy_name: str | None = None
-    policy_type: Literal[
-        "ulip", "endowment", "money_back", "whole_life", "term", "pension", "other"
-    ] | None = None
+    policy_type: (
+        Literal["ulip", "endowment", "money_back", "whole_life", "term", "pension", "other"] | None
+    ) = None
     insurer: str | None = None
     annual_premium: float | None = None
     premium_term_years: int | None = None

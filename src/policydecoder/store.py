@@ -71,9 +71,7 @@ class Persistence:
         self._conn.commit()
 
     def load(self, case_id: str) -> Case | None:
-        row = self._conn.execute(
-            "SELECT * FROM cases WHERE case_id = ?", (case_id,)
-        ).fetchone()
+        row = self._conn.execute("SELECT * FROM cases WHERE case_id = ?", (case_id,)).fetchone()
         return self._row_to_case(row) if row else None
 
     def load_all(self) -> list[Case]:
@@ -97,8 +95,6 @@ class Persistence:
             actions_completed=[
                 CaseAction(**a) for a in json.loads(row["actions_completed"] or "[]")
             ],
-            pending_actions=[
-                CaseAction(**a) for a in json.loads(row["pending_actions"] or "[]")
-            ],
+            pending_actions=[CaseAction(**a) for a in json.loads(row["pending_actions"] or "[]")],
             message_count=row["message_count"],
         )

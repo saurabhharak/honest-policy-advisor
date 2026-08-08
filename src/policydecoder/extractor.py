@@ -155,9 +155,7 @@ class PolicyExtractor:
             print(f"[EXTRACTOR] Life schema validation failed: {e}")
             return raw
 
-    def _extract_pages(
-        self, media_urls: list[str], prompt: str
-    ) -> dict[str, Any]:
+    def _extract_pages(self, media_urls: list[str], prompt: str) -> dict[str, Any]:
         """Run the vision model over each page and merge results."""
         if not media_urls:
             return {}

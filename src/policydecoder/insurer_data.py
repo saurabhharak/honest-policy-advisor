@@ -20,9 +20,11 @@ def load_insurer_metrics() -> dict[str, dict[str, Any]]:
     """Load all insurer metrics keyed by canonical name."""
     global _DATA
     if _DATA is None:
-        with resources.files("policydecoder.data").joinpath(
-            "insurer_metrics.json"
-        ).open("r", encoding="utf-8") as f:
+        with (
+            resources.files("policydecoder.data")
+            .joinpath("insurer_metrics.json")
+            .open("r", encoding="utf-8") as f
+        ):
             raw = json.load(f)
         _DATA = {m["name"]: m for m in raw["insurers"]}
     return _DATA

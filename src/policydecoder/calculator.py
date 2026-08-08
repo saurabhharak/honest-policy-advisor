@@ -66,9 +66,7 @@ def policy_cash_flows(
         premium_date = date(start_date.year + year, start_date.month, start_date.day)
         flows.append((premium_date, -annual_premium))
 
-    maturity_date = date(
-        start_date.year + policy_term_years, start_date.month, start_date.day
-    )
+    maturity_date = date(start_date.year + policy_term_years, start_date.month, start_date.day)
     flows.append((maturity_date, maturity_value))
 
     return flows
@@ -96,7 +94,11 @@ def term_plus_sip_value(
         return 0.0
 
     # Future value of an annuity due (payments at start of period)
-    fv = annual_sip * (((1 + expected_return) ** investment_years - 1) / expected_return) * (1 + expected_return)
+    fv = (
+        annual_sip
+        * (((1 + expected_return) ** investment_years - 1) / expected_return)
+        * (1 + expected_return)
+    )
     return round(fv, 2)
 
 

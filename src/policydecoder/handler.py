@@ -79,9 +79,9 @@ def handle(
         return
 
     # Route to state handler
-    _STATE_ROUTER.get(case.state, {}).get(
-        intent, _handle_unknown
-    )(client, message, case, extractor, analyzer, intent_result)
+    _STATE_ROUTER.get(case.state, {}).get(intent, _handle_unknown)(
+        client, message, case, extractor, analyzer, intent_result
+    )
 
 
 def _handle_media(client, message, extractor, analyzer, conversation_id, sender):
@@ -179,9 +179,7 @@ def _format_health_report(data, report, analysis, confidence) -> str:
         parts.append("\nNo IRDAI benchmark data found for this insurer yet.")
 
     # Verdict
-    verdict_emoji = {"GOOD": "✅", "REVIEW": "🟡", "ALERT": "🔴"}.get(
-        report["overall"], "ℹ️"
-    )
+    verdict_emoji = {"GOOD": "✅", "REVIEW": "🟡", "ALERT": "🔴"}.get(report["overall"], "ℹ️")
     verdict_line = {
         "GOOD": "This policy looks genuinely fine on the terms I could check.",
         "REVIEW": "This policy has a few things worth reviewing before you commit.",
@@ -285,7 +283,9 @@ def _run_analysis(client, message, case, analyzer):
     sum_assured = float(data.get("sum_assured", 0))
 
     # Use 8% benefit illustration as the "official" maturity value
-    maturity_value = float(data.get("maturity_value_at_8pct") or data.get("maturity_value_at_4pct") or 0)
+    maturity_value = float(
+        data.get("maturity_value_at_8pct") or data.get("maturity_value_at_4pct") or 0
+    )
 
     if not all([annual_premium, policy_term, maturity_value]):
         message.reply(
@@ -301,7 +301,9 @@ def _run_analysis(client, message, case, analyzer):
     try:
         policy_xirr = xirr(flows)
     except ValueError as e:
-        message.reply(f"I couldn't calculate the returns — {e}. Could you double-check the numbers?")
+        message.reply(
+            f"I couldn't calculate the returns — {e}. Could you double-check the numbers?"
+        )
         return
 
     # Calculate term + SIP alternative

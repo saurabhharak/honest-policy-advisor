@@ -54,9 +54,7 @@ class Case:
     case_id: str
     user_contact: str
     state: CaseState = CaseState.IDLE
-    timestamp_started: str = field(
-        default_factory=lambda: datetime.now(UTC).isoformat()
-    )
+    timestamp_started: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
     policy_data: dict = field(default_factory=dict)
     calculation_results: dict = field(default_factory=dict)
     analysis_result: dict = field(default_factory=dict)
@@ -106,9 +104,7 @@ class CaseManager:
     def advance_state(self, case_id: str, new_state: CaseState) -> Case:
         case = self._cases[case_id]
         if new_state not in VALID_TRANSITIONS.get(case.state, set()):
-            raise ValueError(
-                f"Invalid state transition: {case.state.value} → {new_state.value}"
-            )
+            raise ValueError(f"Invalid state transition: {case.state.value} → {new_state.value}")
         old_state = case.state.value
         case.state = new_state
         self._persist(case_id)
@@ -128,9 +124,7 @@ class CaseManager:
     def add_action(self, case_id: str, action: str, deadline: str | None = None) -> None:
         case = self._cases[case_id]
         ts = datetime.now(UTC).isoformat()
-        case.pending_actions.append(
-            CaseAction(action=action, timestamp=ts, deadline=deadline)
-        )
+        case.pending_actions.append(CaseAction(action=action, timestamp=ts, deadline=deadline))
         self._persist(case_id)
 
     def complete_action(self, case_id: str, action_name: str, result: str = "") -> None:
