@@ -1,9 +1,10 @@
 """Test doubles. No real LLM, no real channels, no real timers."""
 
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
+from policydecoder import guardrails
 from policydecoder.case_manager import case_manager
 
 
@@ -15,6 +16,18 @@ def reset_case_manager():
     yield
     case_manager._cases.clear()
     case_manager._store = None
+
+
+@pytest.fixture(autouse=True)
+def guardrails_off():
+    """Force guardrails off for every test by default.
+
+    Rails make real LLM calls and depend on GUARDRAILS_ENABLED in the
+    developer's .env. Tests must never hit the real endpoint unless they
+    explicitly patch guardrails.is_enabled (or mock _get_rails).
+    """
+    with patch.object(guardrails, "is_enabled", return_value=False):
+        yield
 
 
 class FakeMessage:

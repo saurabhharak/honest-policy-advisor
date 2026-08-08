@@ -54,6 +54,28 @@ _DISCLAIMER = (
     "constitute formal legal or financial advice.*"
 )
 
+# NeMo's input rails respond to a blocked input with a refusal message
+# rather than surfacing the action variable in the response. A normal input
+# yields a substantive assistant answer. We detect a block by the refusal
+# signal in the assistant's response content.
+_REFUSAL_PATTERNS = (
+    "i'm sorry, i can't respond",
+    "i cannot respond",
+    "i can't respond",
+    "cannot follow that instruction",
+    "can't follow that instruction",
+    "cannot assist",
+    "can't assist",
+    "i'm sorry, but i can't",
+    "cannot process that request",
+)
+
+
+def _is_blocked_response(content: str) -> bool:
+    """Whether the rail's assistant response indicates a block."""
+    lowered = (content or "").lower()
+    return any(pattern in lowered for pattern in _REFUSAL_PATTERNS)
+
 
 class GuardrailValidationError(Exception):
     """Raised when an input rail flags malicious or out-of-bounds content."""
@@ -76,8 +98,8 @@ def validate_user_input(text: str) -> None:
     """
     if not is_enabled():
         return
-    result = _generate_rails_check(text, "user_message")
-    if result.get("metadata", {}).get("action") == "block":
+    response_content = _generate_rails_check(text, "user_message")
+    if _is_blocked_response(response_content):
         raise GuardrailValidationError(
             reason="User prompt injection detected",
             user_message=(
@@ -107,15 +129,15 @@ def validate_policy_fields(data: dict[str, Any]) -> None:
             continue
         if isinstance(value, list):
             value = "\n".join(str(v) for v in value)
-        if isinstance(value, (str, int, float)):
+        if isinstance(value, str | int | float):
             suspicious.append(f"{key}: {value}")
 
     if not suspicious:
         return
 
     sample = "\n".join(suspicious)[:_MAX_SAMPLE_CHARS]
-    result = _generate_rails_check(sample, "policy_document")
-    if result.get("metadata", {}).get("action") == "block":
+    response_content = _generate_rails_check(sample, "policy_document")
+    if _is_blocked_response(response_content):
         raise GuardrailValidationError(
             reason="Policy document injection detected",
             user_message=(
@@ -170,8 +192,8 @@ async def validate_user_input_async(text: str) -> None:
     """Async variant of validate_user_input for async frameworks."""
     if not is_enabled():
         return
-    result = await _generate_rails_check_async(text, "user_message")
-    if result.get("metadata", {}).get("action") == "block":
+    response_content = await _generate_rails_check_async(text, "user_message")
+    if _is_blocked_response(response_content):
         raise GuardrailValidationError(
             reason="User prompt injection detected",
             user_message=(
@@ -194,15 +216,15 @@ async def validate_policy_fields_async(data: dict[str, Any]) -> None:
             continue
         if isinstance(value, list):
             value = "\n".join(str(v) for v in value)
-        if isinstance(value, (str, int, float)):
+        if isinstance(value, str | int | float):
             suspicious.append(f"{key}: {value}")
 
     if not suspicious:
         return
 
     sample = "\n".join(suspicious)[:_MAX_SAMPLE_CHARS]
-    result = await _generate_rails_check_async(sample, "policy_document")
-    if result.get("metadata", {}).get("action") == "block":
+    response_content = await _generate_rails_check_async(sample, "policy_document")
+    if _is_blocked_response(response_content):
         raise GuardrailValidationError(
             reason="Policy document injection detected",
             user_message=(
@@ -240,16 +262,37 @@ def _get_rails():
     return _RAILS
 
 
-def _generate_rails_check(text: str, context: str) -> dict[str, Any]:
-    """Synchronous NeMo generation wrapper (handles the event-loop case)."""
+def _response_content(result) -> str:
+    """Extract the assistant's text content from a NeMo generate() result."""
+    if isinstance(result, dict):
+        return result.get("content", "")
+    # GenerationResponse with .response (list of message dicts) or .content
+    response = getattr(result, "response", None)
+    if isinstance(response, list):
+        for msg in response:
+            if isinstance(msg, dict) and msg.get("role") == "assistant":
+                return msg.get("content", "")
+    if isinstance(response, str):
+        return response
+    return ""
+
+
+def _generate_rails_check(text: str, context: str) -> str:
+    """Synchronous NeMo generation wrapper (handles the event-loop case).
+
+    Returns the assistant's response content (the block refusal or the
+    normal answer), which the callers classify via _is_blocked_response.
+    """
     rails = _get_rails()
     if hasattr(rails, "generate"):
-        return rails.generate(messages=[{"role": "user", "content": text}])
-    # Fallback for async-only APIs
-    return _run_async(rails.generate_async(messages=[{"role": "user", "content": text}]))
+        result = rails.generate(messages=[{"role": "user", "content": text}])
+    else:
+        result = _run_async(rails.generate_async(messages=[{"role": "user", "content": text}]))
+    return _response_content(result)
 
 
-async def _generate_rails_check_async(text: str, context: str) -> dict[str, Any]:
-    """Async NeMo generation wrapper."""
+async def _generate_rails_check_async(text: str, context: str) -> str:
+    """Async NeMo generation wrapper. Returns assistant response content."""
     rails = _get_rails()
-    return await rails.generate_async(messages=[{"role": "user", "content": text}])
+    result = await rails.generate_async(messages=[{"role": "user", "content": text}])
+    return _response_content(result)

@@ -62,5 +62,8 @@ models:
   - type: main
     engine: openai
     model: {config.guardrails_model}
+    parameters:
+      api_key: {config.openai_api_key}
+      base_url: {config.openai_base_url}
 """,
     )
