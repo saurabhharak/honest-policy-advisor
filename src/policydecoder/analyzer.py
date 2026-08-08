@@ -14,6 +14,7 @@ from openai import OpenAI
 
 from policydecoder.config import get_config
 from policydecoder.extractor import parse_json_response
+from policydecoder.guardrails import validate_letter_output
 from policydecoder.prompts import (
     ANALYSIS_PROMPT,
     CLASSIFY_INTENT_PROMPT,
@@ -50,6 +51,16 @@ class PolicyAnalyzer:
         except Exception as e:
             print(f"[ANALYZER] LLM call failed: {e}")
             return ""
+
+    def _generate_letter(self, system: str, prompt: str) -> str:
+        """Generate a natural-language letter and run the output rail.
+
+        Letters are user-facing text, so they get the disclaimer/overpromise
+        sanitization rail. JSON-returning calls use _generate() directly —
+        their shape is enforced by Pydantic, not NeMo.
+        """
+        letter = self._generate(system, prompt)
+        return validate_letter_output(letter)
 
     def classify_intent(
         self, message_text: str, case_state: str, case_summary: str
@@ -162,7 +173,7 @@ class PolicyAnalyzer:
             annual_premium=annual_premium,
             free_look_days=free_look_days,
         )
-        return self._generate(SYSTEM_PROMPT, prompt)
+        return self._generate_letter(SYSTEM_PROMPT, prompt)
 
     def draft_complaint_letter(
         self,
@@ -184,7 +195,7 @@ class PolicyAnalyzer:
             xirr=round(xirr * 100, 2),
             misselling_reasons="\n".join(f"- {r}" for r in misselling_reasons),
         )
-        return self._generate(SYSTEM_PROMPT, prompt)
+        return self._generate_letter(SYSTEM_PROMPT, prompt)
 
     def draft_ombudsman_letter(
         self,
@@ -206,7 +217,7 @@ class PolicyAnalyzer:
             annual_premium=annual_premium,
             issue_summary=issue_summary,
         )
-        return self._generate(SYSTEM_PROMPT, prompt)
+        return self._generate_letter(SYSTEM_PROMPT, prompt)
 
     def draft_status_response(
         self,
@@ -224,4 +235,4 @@ class PolicyAnalyzer:
             policy_name=policy_name,
             key_finding=key_finding,
         )
-        return self._generate(SYSTEM_PROMPT, prompt)
+        return self._generate_letter(SYSTEM_PROMPT, prompt)

@@ -33,6 +33,9 @@ dev = [
     "ruff>=0.9.0",
     "mypy>=1.14.0",
 ]
+guardrails = [
+    "nemoguardrails>=0.10.0",
+]
 
 [project.scripts]
 policydecoder = "policydecoder.main:run"

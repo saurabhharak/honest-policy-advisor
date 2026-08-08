@@ -29,6 +29,8 @@ class Config:
     llm_model: str
     vision_model: str
     agent_username: str
+    guardrails_enabled: bool
+    guardrails_model: str
 
 
 _config: Config | None = None
@@ -37,14 +39,18 @@ _config: Config | None = None
 def get_config() -> Config:
     global _config
     if _config is None:
+        llm_model = _optional("LLM_MODEL", "gpt-4o-mini")
         _config = Config(
             caspian_api_key=_require("CASPIAN_API_KEY"),
             caspian_base_url=_optional("CASPIAN_BASE_URL", "https://api.trycaspianai.com"),
             telegram_bot_token=_require("TELEGRAM_BOT_TOKEN"),
             openai_api_key=_require("OPENAI_API_KEY"),
             openai_base_url=_optional("OPENAI_BASE_URL", "https://api.openai.com/v1"),
-            llm_model=_optional("LLM_MODEL", "gpt-4o-mini"),
+            llm_model=llm_model,
             vision_model=_optional("VISION_MODEL", "Qwen/Qwen3-VL-8B-Instruct"),
             agent_username=_optional("AGENT_USERNAME", "policydecoder"),
+            guardrails_enabled=os.getenv("GUARDRAILS_ENABLED", "").strip().lower()
+            in ("1", "true", "yes"),
+            guardrails_model=_optional("GUARDRAILS_MODEL", llm_model),
         )
     return _config

@@ -21,6 +21,11 @@ from policydecoder.calculator import (
 from policydecoder.case_manager import CaseState, case_manager
 from policydecoder.email_link import build_gmail_compose_url
 from policydecoder.extractor import PolicyExtractor
+from policydecoder.guardrails import (
+    GuardrailValidationError,
+    validate_policy_fields,
+    validate_user_input,
+)
 from policydecoder.health_calculator import score_health_policy
 from policydecoder.insurer_data import get_insurer_metrics
 from policydecoder.router import HEALTH, classify_document
@@ -58,6 +63,13 @@ def handle(
 
     if not text:
         message.reply("Send me a photo or PDF of your insurance policy and I'll analyze it.")
+        return
+
+    # Input rail: block prompt-injection / jailbreak attempts on user text.
+    try:
+        validate_user_input(text)
+    except GuardrailValidationError as e:
+        message.reply(e.user_message)
         return
 
     case = case_manager.get_or_create(conversation_id, sender)
@@ -119,6 +131,13 @@ def _handle_health_media(message, extractor, analyzer, media_urls, case, confide
             "2. The page with the sum insured, premium, and room rent details\n"
             "3. Or just type the details: sum insured, annual premium, insurer"
         )
+        return
+
+    # Input rail: block prompt-injection embedded in the policy document.
+    try:
+        validate_policy_fields(data)
+    except GuardrailValidationError as e:
+        message.reply(e.user_message)
         return
 
     # Score against the insurer benchmark
@@ -228,6 +247,13 @@ def _handle_life_media(message, extractor, analyzer, media_urls, case):
             "2. The first page of the policy (has the key details)\n"
             "3. Or just type the details: policy name, annual premium, term, sum assured"
         )
+        return
+
+    # Input rail: block prompt-injection embedded in the policy document.
+    try:
+        validate_policy_fields(data)
+    except GuardrailValidationError as e:
+        message.reply(e.user_message)
         return
 
     # Store what we extracted
