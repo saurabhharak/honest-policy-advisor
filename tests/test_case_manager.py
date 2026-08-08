@@ -2,13 +2,13 @@
 
 import pytest
 
-from policydecoder.case_manager import CaseManager, CaseState, VALID_TRANSITIONS
+from policydecoder.case_manager import VALID_TRANSITIONS, CaseManager, CaseState
 
 
 class TestStateTransitions:
     def test_idle_to_policy_received(self):
         cm = CaseManager()
-        case = cm.get_or_create("test1", "user@test.com")
+        cm.get_or_create("test1", "user@test.com")
         cm.advance_state("test1", CaseState.POLICY_RECEIVED)
         assert cm.get("test1").state == CaseState.POLICY_RECEIVED
 

@@ -42,8 +42,8 @@ def xirr(cash_flows: list[tuple[date, float]], guess: float = 0.1) -> float:
 
     try:
         return brentq(npv, -0.99, 10.0, xtol=1e-6)
-    except ValueError:
-        raise ValueError("XIRR did not converge — check cash flow data")
+    except ValueError as e:
+        raise ValueError("XIRR did not converge — check cash flow data") from e
 
 
 def policy_cash_flows(

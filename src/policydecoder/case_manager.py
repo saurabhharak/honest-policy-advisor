@@ -4,8 +4,8 @@ Channel-agnostic. This module has zero awareness of email vs Telegram.
 """
 
 import json
-from datetime import datetime, timezone
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from enum import Enum
 from typing import Any
 
@@ -55,7 +55,7 @@ class Case:
     user_contact: str
     state: CaseState = CaseState.IDLE
     timestamp_started: str = field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat()
+        default_factory=lambda: datetime.now(UTC).isoformat()
     )
     policy_data: dict = field(default_factory=dict)
     calculation_results: dict = field(default_factory=dict)
@@ -127,7 +127,7 @@ class CaseManager:
 
     def add_action(self, case_id: str, action: str, deadline: str | None = None) -> None:
         case = self._cases[case_id]
-        ts = datetime.now(timezone.utc).isoformat()
+        ts = datetime.now(UTC).isoformat()
         case.pending_actions.append(
             CaseAction(action=action, timestamp=ts, deadline=deadline)
         )
@@ -192,5 +192,5 @@ case_manager = CaseManager()
 
 
 def _log_action(case_id: str, action: str, detail: str) -> None:
-    ts = datetime.now(timezone.utc).isoformat()[:26]
+    ts = datetime.now(UTC).isoformat()[:26]
     print(f"[{ts}] CASE:{case_id[:12]} ACTION:{action} {detail}")

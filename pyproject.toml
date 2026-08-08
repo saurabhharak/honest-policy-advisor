@@ -19,6 +19,7 @@ classifiers = [
 dependencies = [
     "caspian-sdk>=0.1.0",
     "openai>=1.0.0",
+    "pydantic>=2.0.0",
     "python-dotenv>=1.0.0",
     "requests>=2.34.2",
     "scipy>=1.11.0",
@@ -42,7 +43,9 @@ testpaths = ["tests"]
 
 [tool.ruff]
 target-version = "py311"
-lint.select = ["E", "F", "I", "N"]
+line-length = 100
+lint.select = ["E", "F", "I", "N", "UP", "B", "SIM"]
+lint.ignore = ["E501"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/policydecoder"]

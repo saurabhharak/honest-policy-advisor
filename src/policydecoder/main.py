@@ -8,7 +8,7 @@ Usage:
     policydecoder
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from caspian_sdk import CommClient
 from openai import OpenAI
@@ -36,7 +36,7 @@ def run() -> None:
     print(f"  Telegram: @{telegram_conn['address']}")
     print(f"  LLM:      {config.llm_model}")
     print(f"  Vision:   {config.vision_model}")
-    print(f"  Started:  {datetime.now(timezone.utc).isoformat()[:19]}Z")
+    print(f"  Started:  {datetime.now(UTC).isoformat()[:19]}Z")
     print()
 
     llm = OpenAI(
