@@ -1,0 +1,115 @@
+"""Test doubles. No real LLM, no real channels, no real timers."""
+
+import pytest
+from unittest.mock import MagicMock
+
+from policydecoder.case_manager import case_manager, CaseState
+
+
+@pytest.fixture(autouse=True)
+def reset_case_manager():
+    """Reset the singleton case manager before each test."""
+    case_manager._cases.clear()
+    case_manager._store = None
+    yield
+    case_manager._cases.clear()
+    case_manager._store = None
+
+
+class FakeMessage:
+    """Mimics the Caspian SDK Message object."""
+
+    def __init__(self, text="", conversation_id="test_conv", sender=None, media=None):
+        self.text = text
+        self.conversation_id = conversation_id
+        self.sender = sender or {"address": "test@example.com"}
+        self.media = media or []
+        self.replies = []
+        self.typing_calls = 0
+
+    def reply(self, text):
+        self.replies.append(text)
+
+    def typing(self):
+        self.typing_calls += 1
+
+
+class FakeExtractor:
+    """Returns canned extraction results. No real vision model."""
+
+    def __init__(self, canned_data=None):
+        if canned_data is not None:
+            self.canned_data = canned_data
+        else:
+            self.canned_data = {
+            "policy_name": "LIC Jeevan Anand",
+            "policy_type": "endowment",
+            "insurer": "LIC",
+            "annual_premium": 50000,
+            "premium_term_years": 15,
+            "policy_term_years": 15,
+            "sum_assured": 1000000,
+            "maturity_value_at_8pct": 1120000,
+            "maturity_value_at_4pct": 780000,
+            "free_look_period_days": 15,
+        }
+
+    def extract_from_image(self, url):
+        return self.canned_data
+
+    def extract_from_images(self, urls):
+        return self.canned_data
+
+    def validate_extraction(self, data):
+        required = ["policy_name", "annual_premium", "policy_term_years", "sum_assured"]
+        return [f for f in required if not data.get(f)]
+
+
+class FakeAnalyzer:
+    """Returns canned analysis results. No real LLM."""
+
+    def __init__(self, canned_analysis=None):
+        self.canned_analysis = canned_analysis or {
+            "is_likely_missold": True,
+            "misselling_reasons": [
+                "Endowment plan sold as investment",
+                "XIRR below 5%",
+            ],
+            "recommended_action": "surrender_and_complaint",
+            "escalation_path": "insurer_complaint",
+            "summary": "This endowment plan returns 3.8% while a term+SIP would return 11%.",
+            "key_findings": [
+                "XIRR of 3.8% is below savings account rates",
+                "Premium allocation charge of 4.2% in year 1",
+            ],
+        }
+
+    def classify_intent(self, message_text, case_state, case_summary):
+        if "policy" in message_text.lower() or "insurance" in message_text.lower():
+            return {"intent": "NEW_POLICY", "confidence": 0.95, "extracted_info": {}}
+        if message_text.strip().isdigit():
+            return {
+                "intent": "INFO_RESPONSE",
+                "confidence": 0.9,
+                "extracted_info": {"user_age": message_text.strip()},
+            }
+        if "confirm" in message_text.lower() or "yes" in message_text.lower():
+            return {"intent": "CONFIRM_ACTION", "confidence": 0.9, "extracted_info": {}}
+        if "status" in message_text.lower():
+            return {"intent": "STATUS_CHECK", "confidence": 0.95, "extracted_info": {}}
+        return {"intent": "UNKNOWN", "confidence": 0.3, "extracted_info": {}}
+
+    def analyze_policy(self, **kwargs):
+        return self.canned_analysis
+
+    def draft_free_look_letter(self, **kwargs):
+        return "Dear Sir/Madam,\n\nI wish to cancel my policy under the free-look period..."
+
+    def draft_complaint_letter(self, **kwargs):
+        return "Dear Grievance Officer,\n\nI am writing to complain about a mis-sold policy..."
+
+    def draft_ombudsman_letter(self, **kwargs):
+        return "To the Insurance Ombudsman,\n\nI am filing a complaint against..."
+
+    def draft_status_response(self, **kwargs):
+        return "Your case is being processed."

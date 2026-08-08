@@ -1,0 +1,195 @@
+"""LLM-driven analysis and letter drafting.
+
+The LLM receives extracted data and calculation results, then decides:
+1. Was this policy mis-sold?
+2. What's the right escalation path?
+3. Draft the appropriate letter.
+
+The LLM never does math. It receives numbers from calculator.py.
+"""
+
+import json
+from typing import Any
+
+from openai import OpenAI
+
+from policydecoder.config import get_config
+from policydecoder.extractor import parse_json_response
+from policydecoder.prompts import (
+    ANALYSIS_PROMPT,
+    CLASSIFY_INTENT_PROMPT,
+    COMPLAINT_LETTER_PROMPT,
+    FREE_LOOK_LETTER_PROMPT,
+    OMBUDSMAN_LETTER_PROMPT,
+    STATUS_RESPONSE_PROMPT,
+    SYSTEM_PROMPT,
+)
+
+
+class PolicyAnalyzer:
+    """Analyzes policies and drafts letters via LLM."""
+
+    def __init__(self, llm_client: OpenAI):
+        self.llm = llm_client
+        self.model = get_config().llm_model
+
+    def _generate(self, system: str, user: str, timeout: float = 15.0) -> str:
+        try:
+            response = self.llm.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": user},
+                ],
+                temperature=0.7,
+                max_tokens=2000,
+                timeout=timeout,
+            )
+            content = response.choices[0].message.content
+            return content.strip() if content else ""
+        except Exception as e:
+            print(f"[ANALYZER] LLM call failed: {e}")
+            return ""
+
+    def classify_intent(
+        self, message_text: str, case_state: str, case_summary: str
+    ) -> dict[str, Any]:
+        prompt = CLASSIFY_INTENT_PROMPT.format(
+            case_state=case_state,
+            case_summary=case_summary,
+            message_text=message_text,
+        )
+        result = self._generate(SYSTEM_PROMPT, prompt, timeout=10.0)
+        parsed = parse_json_response(result)
+        if parsed and "intent" in parsed:
+            return parsed
+        return {"intent": "UNKNOWN", "confidence": 0.0, "extracted_info": {}}
+
+    def analyze_policy(
+        self,
+        *,
+        extracted_json: str,
+        policy_xirr: float,
+        term_sip_value: float,
+        policy_maturity: float,
+        opportunity_cost: float,
+        term_cost: float,
+        premiums_paid: float,
+        surrender_value: float,
+        surrender_loss: float,
+        user_age: int,
+        days_since_purchase: int,
+        free_look_days: int,
+    ) -> dict[str, Any]:
+        """Analyze a policy for mis-selling indicators.
+
+        All numbers come from calculator.py. The LLM only interprets them.
+        """
+        prompt = ANALYSIS_PROMPT.format(
+            extracted_json=extracted_json,
+            policy_xirr=round(policy_xirr * 100, 2),
+            term_sip_value=term_sip_value,
+            policy_maturity=policy_maturity,
+            opportunity_cost=opportunity_cost,
+            term_cost=term_cost,
+            premiums_paid=premiums_paid,
+            surrender_value=surrender_value,
+            surrender_loss=surrender_loss,
+            user_age=user_age,
+            days_since_purchase=days_since_purchase,
+            free_look_days=free_look_days,
+        )
+        result = self._generate(SYSTEM_PROMPT, prompt, timeout=20.0)
+        parsed = parse_json_response(result)
+        if parsed and "is_likely_missold" in parsed:
+            return parsed
+        return {
+            "is_likely_missold": None,
+            "misselling_reasons": [],
+            "recommended_action": "unknown",
+            "escalation_path": "none",
+            "summary": "Analysis could not be completed. Please try again.",
+            "key_findings": [],
+        }
+
+    def draft_free_look_letter(
+        self,
+        *,
+        policy_name: str,
+        insurer: str,
+        policy_number: str,
+        purchase_date: str,
+        annual_premium: float,
+        free_look_days: int,
+    ) -> str:
+        prompt = FREE_LOOK_LETTER_PROMPT.format(
+            policy_name=policy_name,
+            insurer=insurer,
+            policy_number=policy_number,
+            purchase_date=purchase_date,
+            annual_premium=annual_premium,
+            free_look_days=free_look_days,
+        )
+        return self._generate(SYSTEM_PROMPT, prompt)
+
+    def draft_complaint_letter(
+        self,
+        *,
+        policy_name: str,
+        insurer: str,
+        annual_premium: float,
+        policy_type: str,
+        purchase_date: str,
+        xirr: float,
+        misselling_reasons: list[str],
+    ) -> str:
+        prompt = COMPLAINT_LETTER_PROMPT.format(
+            policy_name=policy_name,
+            insurer=insurer,
+            annual_premium=annual_premium,
+            policy_type=policy_type,
+            purchase_date=purchase_date,
+            xirr=round(xirr * 100, 2),
+            misselling_reasons="\n".join(f"- {r}" for r in misselling_reasons),
+        )
+        return self._generate(SYSTEM_PROMPT, prompt)
+
+    def draft_ombudsman_letter(
+        self,
+        *,
+        insurer: str,
+        complaint_date: str,
+        days_elapsed: int,
+        insurer_response: str,
+        policy_name: str,
+        annual_premium: float,
+        issue_summary: str,
+    ) -> str:
+        prompt = OMBUDSMAN_LETTER_PROMPT.format(
+            insurer=insurer,
+            complaint_date=complaint_date,
+            days_elapsed=days_elapsed,
+            insurer_response=insurer_response,
+            policy_name=policy_name,
+            annual_premium=annual_premium,
+            issue_summary=issue_summary,
+        )
+        return self._generate(SYSTEM_PROMPT, prompt)
+
+    def draft_status_response(
+        self,
+        *,
+        case_state: str,
+        actions_completed: str,
+        pending_actions: str,
+        policy_name: str,
+        key_finding: str,
+    ) -> str:
+        prompt = STATUS_RESPONSE_PROMPT.format(
+            case_state=case_state,
+            actions_completed=actions_completed,
+            pending_actions=pending_actions,
+            policy_name=policy_name,
+            key_finding=key_finding,
+        )
+        return self._generate(SYSTEM_PROMPT, prompt)

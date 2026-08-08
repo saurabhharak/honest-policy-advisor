@@ -1,0 +1,48 @@
+[project]
+name = "policy-decoder"
+version = "0.1.0"
+description = "Reads your insurance policy PDF, tells you if you were mis-sold, and drafts the complaint letter"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.11"
+authors = [
+    {name = "Saurabh Harak", email = "saurabhharak@example.com"}
+]
+keywords = ["ai-agent", "caspian-sdk", "insurance", "hackathon"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+
+dependencies = [
+    "caspian-sdk>=0.1.0",
+    "openai>=1.0.0",
+    "python-dotenv>=1.0.0",
+    "requests>=2.34.2",
+    "scipy>=1.11.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23",
+]
+
+[project.scripts]
+policydecoder = "policydecoder.main:run"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py311"
+lint.select = ["E", "F", "I", "N"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/policydecoder"]
