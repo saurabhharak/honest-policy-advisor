@@ -1,0 +1,19 @@
+{
+  "mcpServers": {
+    "fetch": {
+      "transport": "stdio",
+      "enabled": true,
+      "command": "uvx",
+      "args": [
+        "--from",
+        "mcp-server-fetch",
+        "--with",
+        "mcp==1.29.0",
+        "mcp-server-fetch"
+      ],
+      "env": {
+        "PYTHONIOENCODING": "utf-8"
+      }
+    }
+  }
+}
