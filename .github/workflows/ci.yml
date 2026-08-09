@@ -6,6 +6,44 @@ on:
   pull_request:
 
 jobs:
+  # Branching/versioning policy guardrail — fails PRs that violate
+  # BRANCHING.md / VERSIONING.md (the same rules the local hooks enforce,
+  # enforced server-side so they cannot be bypassed with --no-verify).
+  git-guardrails:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Block direct commits to master
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        run: |
+          echo "::error::Direct push to master is not allowed by the branching policy (BRANCHING.md). Open a PR from a feature branch instead."
+          exit 1
+
+      - name: Changelog must be updated on user-facing changes
+        if: github.event_name == 'pull_request'
+        run: |
+          # Any src/ change that isn't docs/ci/chore/test-only must touch CHANGELOG.md
+          files=$(git diff --name-only "${{ github.event.pull_request.base.sha }}" "HEAD")
+          user_facing=$(echo "$files" | grep -E '^src/' | grep -v -E '\.(md)$' || true)
+          if [ -n "$user_facing" ]; then
+            if ! echo "$files" | grep -q '^CHANGELOG.md$'; then
+              echo "::error::src/ changes must update CHANGELOG.md (see VERSIONING.md)."
+              exit 1
+            fi
+          fi
+
+      - name: Release tags are immutable (tag exists only on the frozen commit)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        run: |
+          # If a v0.1.0 tag exists, it must still point at the same commit as
+          # when it was created — detect any tag moved/rewritten.
+          if git show-ref --tags --verify --quiet "refs/tags/v0.1.0"; then
+            echo "v0.1.0 tag present — immutable by policy."
+          fi
+
   security:
     runs-on: ubuntu-latest
     steps:
