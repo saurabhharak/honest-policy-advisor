@@ -103,7 +103,8 @@ class PolicyExtractor:
         Works for both email attachments and Telegram photos — the Caspian
         SDK normalizes both into media URLs.
         """
-        assert self.llm is not None, "extract_from_image requires an LLM client"
+        if self.llm is None:
+            raise RuntimeError("extract_from_image requires an LLM client")
         try:
             response = self.llm.chat.completions.create(
                 model=self.vision_model,
@@ -143,7 +144,8 @@ class PolicyExtractor:
         import base64
         import mimetypes
 
-        assert self.llm is not None, "extract_from_image_path requires an LLM client"
+        if self.llm is None:
+            raise RuntimeError("extract_from_image_path requires an LLM client")
         try:
             mime = mimetypes.guess_type(image_path)[0] or "image/png"
             with open(image_path, "rb") as f:
@@ -202,7 +204,8 @@ class PolicyExtractor:
 
     def _extract_single(self, media_url: str, prompt: str) -> dict[str, Any]:
         """Call the vision model once for a single page."""
-        assert self.llm is not None, "_extract_single requires an LLM client"
+        if self.llm is None:
+            raise RuntimeError("_extract_single requires an LLM client")
         try:
             response = self.llm.chat.completions.create(
                 model=self.vision_model,

@@ -6,6 +6,40 @@ on:
   pull_request:
 
 jobs:
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # full history for gitleaks
+
+      - name: Secret scan (gitleaks)
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Dependency scan (trivy)
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: fs
+          scan-ref: .
+          severity: HIGH,CRITICAL
+          exit-code: "1"
+
+      - name: Python SAST (bandit)
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Run bandit
+        run: |
+          pip install bandit
+          bandit -r src -x tests -f sarif -o bandit.sarif
+      - name: Upload bandit results
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: bandit.sarif
+        if: always()
+
   test:
     runs-on: ubuntu-latest
     strategy:
@@ -26,10 +60,10 @@ jobs:
         run: uv sync --all-extras
 
       - name: Lint (ruff)
-        run: uv run ruff check src tests
+        run: uv run ruff check src tests scripts
 
       - name: Format check (ruff)
-        run: uv run ruff format --check src tests
+        run: uv run ruff format --check src tests scripts
 
       - name: Type check (mypy)
         run: uv run mypy src/policydecoder
