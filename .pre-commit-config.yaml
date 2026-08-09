@@ -33,6 +33,12 @@ repos:
         language: system
         always_run: true
         pass_filenames: false
+      - id: no-commit-on-detached-head
+        name: no-commit-on-detached-head (branching guardrail)
+        entry: python scripts/git-hooks/no-commit-on-detached-head.py
+        language: system
+        always_run: true
+        pass_filenames: false
       - id: no-force-push-master
         name: no-force-push-master (branching guardrail)
         entry: python scripts/git-hooks/no-force-push-master.py
