@@ -407,8 +407,11 @@ class TestUrlPdfMedia:
         msg = FakeMessage(
             text="",
             media=[
-                {"url": "https://example.com/photo.jpg", "name": "photo.jpg",
-                 "mime_type": "image/jpeg"}
+                {
+                    "url": "https://example.com/photo.jpg",
+                    "name": "photo.jpg",
+                    "mime_type": "image/jpeg",
+                }
             ],
         )
         extractor = FakeExtractor()
