@@ -69,11 +69,21 @@ CI runs all four on every push/PR. Make them pass locally first.
 - Version bumps follow the commit history: `fix:` → PATCH, `feat:` → MINOR,
   `BREAKING CHANGE:` → MAJOR. Keep every user-visible change in `CHANGELOG.md`.
 
+## Branching
+
+- This project uses **GitHub Flow** (see [BRANCHING.md](BRANCHING.md)): short-lived
+  `feat/…`, `fix/…` branches merged to `master` via PR; releases are tags, never
+  branches. There is no `develop` branch.
+- **Never commit directly to `master`** and **never force-push `master`** —
+  both are blocked by pre-commit/pre-push hooks.
+- Frozen release tags (`v0.1.0`) are immutable; to patch one, branch
+  `hotfix/v0.1.x` off the tag and cherry-pick back to `master`.
+
 ## Committing
 
 - Keep commits focused on one logical change.
 - Follow conventional commit prefixes: `feat:`, `fix:`, `chore:`, `docs:`, `ci:`, `test:`.
-- Pre-commit hooks (ruff lint/format, uv lock check) run automatically.
+- Pre-commit hooks (ruff lint/format, uv lock check, branch guardrails) run automatically.
 
 ## Reporting issues
 
