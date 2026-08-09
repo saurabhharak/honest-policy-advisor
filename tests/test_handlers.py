@@ -360,3 +360,72 @@ class TestBase64Media:
         assert len(msg.replies) >= 1
         # The supervisor got a local input_path (temp file), not just URLs
         assert supervisor.process_media_called_with_input_path is True
+
+
+class TestUrlPdfMedia:
+    def test_pdf_url_downloaded_and_passed_as_path(self):
+        """A PDF delivered via URL is downloaded and passed as input_path."""
+        client = _make_client()
+        msg = FakeMessage(
+            text="",
+            media=[
+                {
+                    "url": "https://example.com/policy.pdf",
+                    "name": "policy.pdf",
+                    "mime_type": "application/pdf",
+                }
+            ],
+        )
+        extractor = FakeExtractor()
+        analyzer = FakeAnalyzer()
+        supervisor = MagicMock()
+
+        async def fake_process(media_urls, conversation_id="", channel="unknown", input_path=None):
+            supervisor.process_media_called_with_input_path = input_path is not None
+            supervisor.process_media_used_path = input_path
+            return {"data": {"policy_name": "Test"}, "analysis": {"summary": "ok"}}
+
+        supervisor.process_media = fake_process
+
+        # The fake requests.get returns a response with .content and .ok
+        fake_resp = MagicMock()
+        fake_resp.ok = True
+        fake_resp.content = b"%PDF-1.4 from url"
+
+        with (
+            patch.object(guardrails, "is_enabled", return_value=False),
+            patch("requests.get", return_value=fake_resp),
+        ):
+            handle(client, msg, extractor, analyzer, supervisor=supervisor)
+
+        assert len(msg.replies) >= 1
+        assert supervisor.process_media_called_with_input_path is True
+
+    def test_image_url_not_downloaded(self):
+        """A jpg URL is NOT downloaded — it goes straight to the vision path."""
+        client = _make_client()
+        msg = FakeMessage(
+            text="",
+            media=[
+                {"url": "https://example.com/photo.jpg", "name": "photo.jpg",
+                 "mime_type": "image/jpeg"}
+            ],
+        )
+        extractor = FakeExtractor()
+        analyzer = FakeAnalyzer()
+        supervisor = MagicMock()
+
+        async def fake_process(media_urls, conversation_id="", channel="unknown", input_path=None):
+            supervisor.process_media_called_with_input_path = input_path is not None
+            return {"data": {}, "analysis": {}}
+
+        supervisor.process_media = fake_process
+
+        with (
+            patch.object(guardrails, "is_enabled", return_value=False),
+            patch("requests.get") as mock_get,
+        ):
+            handle(client, msg, extractor, analyzer, supervisor=supervisor)
+
+        mock_get.assert_not_called()
+        assert supervisor.process_media_called_with_input_path is False

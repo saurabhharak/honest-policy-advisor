@@ -130,28 +130,13 @@ class ResearcherAgent(BaseAgent):
 
 
 async def _default_fetch(url: str):
-    """Default fetch: try the MCP fetch tool, fall back to HTTP."""
-    try:
-        from mcp import ClientSession, StdioServerParameters
-        from mcp.client.stdio import stdio_client
-    except ImportError:
-        return await _http_fetch(url)
+    """Default fetch: plain HTTP with a short timeout.
 
-    # Try MCP fetch server if configured (matches the .mcp.json setup)
-    try:
-        server_params = StdioServerParameters(command="uvx", args=["mcp-server-fetch"])
-        async with (
-            stdio_client(server_params) as (read, write),
-            ClientSession(read, write) as session,
-        ):
-            await session.initialize()
-            result = await session.call_tool("fetch", {"url": url, "max_length": 5000})
-            if result and getattr(result, "content", None):
-                return "\n".join(
-                    str(part.text) for part in result.content if getattr(part, "text", None)
-                )
-    except Exception as e:
-        logger.warning("MCP fetch failed for %s, falling back to HTTP: %s", url, e)
+    The old implementation spawned a `uvx mcp-server-fetch` stdio
+    subprocess per URL, which could hang for minutes on `session.initialize()`
+    and block the whole supervisor gather. A direct requests.get is fast,
+    dependency-free, and still enforces the whitelist upstream.
+    """
     return await _http_fetch(url)
 
 

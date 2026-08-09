@@ -167,8 +167,19 @@ def _pipeline_options() -> Any:
             )
         else:
             opts.accelerator_options = AcceleratorOptions(
-                num_threads=4, device=AcceleratorDevice.CPU
+                num_threads=2, device=AcceleratorDevice.CPU
             )
+
+        # Memory safety: batch one page at a time and keep inter-stage queues
+        # small. Defaults (batch=4, queue=100) can OOM the layout/OCR stages
+        # on long policies (20+ pages) under constrained RAM — the failure we
+        # saw as `std::bad_alloc` on pages 16-20. Page-at-a-time is slower but
+        # bounded, so a big policy parses instead of hanging.
+        opts.ocr_batch_size = 1
+        opts.layout_batch_size = 1
+        opts.table_batch_size = 1
+        opts.queue_max_size = 8
+        opts.batch_polling_interval_seconds = 0.05
         return opts
     except Exception as e:
         logger.warning("Docling pipeline options unavailable: %s", e)

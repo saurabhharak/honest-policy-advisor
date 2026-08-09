@@ -58,13 +58,33 @@ _configured = False
 
 
 def configure_logging(level: int = logging.INFO) -> None:
-    """Configure the root logger handler/formatter once."""
+    """Configure the root logger handler/formatter once.
+
+    Writes to stderr AND to policydecoder.log in the project root, so
+    background runs (whose stdout isn't captured on Windows) are still
+    diagnosable.
+    """
     global _configured
     if _configured:
         return
-    handler = logging.StreamHandler()
-    handler.setFormatter(SafeFormatter(_FORMAT))
+    fmt = SafeFormatter(_FORMAT)
+
+    stream = logging.StreamHandler()
+    stream.setFormatter(fmt)
     root = logging.getLogger()
-    root.addHandler(handler)
+    root.addHandler(stream)
+
+    try:
+        from pathlib import Path
+
+        file_handler = logging.FileHandler(
+            Path(__file__).resolve().parent.parent.parent / "policydecoder.log",
+            encoding="utf-8",
+        )
+        file_handler.setFormatter(fmt)
+        root.addHandler(file_handler)
+    except Exception:
+        pass  # file logging is best-effort
+
     root.setLevel(level)
     _configured = True

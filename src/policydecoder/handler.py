@@ -107,11 +107,41 @@ def _handle_media_supervisor(message, supervisor, media):
             input_path = tmp
             media_urls.append(f"file://{tmp}")
         elif url:
+            # If the URL points at a file, download it so Docling can parse it
+            # locally. The Caspian gateway delivers Telegram attachments as
+            # `https://api.telegram.orgfile/bot<token>/...` (missing slash),
+            # which the vision model can't read — so we must download.
+            name = m.get("name") or url.split("?")[0]
+            suffix = Path(name).suffix.lower()
+            is_telegram_file = "telegram.org" in url and "file" in url
+            if suffix == ".pdf" or is_telegram_file:
+                try:
+                    import requests
+
+                    # Normalize the malformed `orgfile` → `org/file` URL
+                    fetch_url = url.replace("telegram.orgfile/", "telegram.org/file/")
+                    resp = requests.get(fetch_url, timeout=60)
+                    if resp.ok and resp.content:
+                        fd, tmp = tempfile.mkstemp(suffix=".pdf")
+                        with open(fd, "wb") as f:
+                            f.write(resp.content)
+                        input_path = tmp
+                        media_urls.append(f"file://{tmp}")
+                        logger.info("Downloaded Telegram file → %s (%s bytes)", tmp, len(resp.content))
+                        continue
+                except Exception as e:
+                    logger.warning("Failed to download media URL %s: %s", url[:60], e)
             media_urls.append(url)
 
     if not media_urls:
         message.reply("I received an attachment but couldn't read it. Could you try again?")
         return
+
+    logger.info(
+        "Media → input_path=%s media_urls=%s",
+        input_path,
+        [u[:60] for u in media_urls],
+    )
 
     message.typing()
     result = asyncio.run(

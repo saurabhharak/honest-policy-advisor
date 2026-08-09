@@ -62,6 +62,13 @@ CI runs all four on every push/PR. Make them pass locally first.
 - Update `as_of` and keep `source_url` on every row.
 - Never guess a missing value — use `null`; the scorer reports "no data".
 
+## Versioning
+
+- This project uses Semantic Versioning (see [VERSIONING.md](VERSIONING.md)).
+- The version lives only in `pyproject.toml`; releases are annotated git tags.
+- Version bumps follow the commit history: `fix:` → PATCH, `feat:` → MINOR,
+  `BREAKING CHANGE:` → MAJOR. Keep every user-visible change in `CHANGELOG.md`.
+
 ## Committing
 
 - Keep commits focused on one logical change.

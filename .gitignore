@@ -7,5 +7,14 @@ dist/
 *.egg-info/
 .pytest_cache/
 
+# Local debug artifacts (JSON dumps, bot logs, rendered pages)
+*.log
+*.rendered_pages/
+t*.json
+sp*.json
+tr*.json
+ev.json
+$null
+
 # Downloaded/synthetic insurance policy PDFs (regenerable via scripts/)
 insurance_policies/
