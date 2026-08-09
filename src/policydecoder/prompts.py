@@ -46,11 +46,14 @@ Extract these TEXT fields and return ONLY a JSON object:
     "policy_start_date": "string or null (YYYY-MM-DD)",
     "policy_term_years": "number or null",
     "premium_term_years": "number or null",
+    "sum_assured": "number or null",
+    "maturity_value_at_4pct": "number or null (from benefit illustration at 4% rate)",
+    "maturity_value_at_8pct": "number or null (from benefit illustration at 8% rate)",
     "free_look_period_days": "number or null"
 }}
 
 Use the document text below. If a field is not present, use null. Do not guess or invent values.
-The accuracy of premium, term, and dates is critical.
+The accuracy of premium, term, dates, and maturity values is critical.
 
 == DOCUMENT TEXT ==
 {document_text}"""

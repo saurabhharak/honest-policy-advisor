@@ -6,3 +6,6 @@ __pycache__/
 dist/
 *.egg-info/
 .pytest_cache/
+
+# Downloaded/synthetic insurance policy PDFs (regenerable via scripts/)
+insurance_policies/

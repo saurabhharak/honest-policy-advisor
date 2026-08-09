@@ -119,7 +119,13 @@ class ExtractorAgent(BaseAgent):
         return data
 
     def _extract_text_fields(self, markdown: str) -> dict[str, Any]:
-        prompt = DOCLING_TEXT_EXTRACTION_PROMPT.format(document_text=markdown[:12000])
+        """Text-LLM extraction over markdown. The schedule + benefit
+        illustration often live in the first pages or the appendix, so we
+        scan the head AND tail (capped) rather than one contiguous window."""
+        head = markdown[:8000]
+        tail = markdown[-8000:] if len(markdown) > 16000 else ""
+        combined = head + ("\n[...middle omitted...]\n" + tail if tail else "")
+        prompt = DOCLING_TEXT_EXTRACTION_PROMPT.format(document_text=combined)
         content = self.generate("You are a policy text extractor.", prompt, timeout=20)
         parsed = parse_json_response(content)
         return parsed if parsed else {}
