@@ -9,6 +9,7 @@ Usage:
 """
 
 from datetime import UTC, datetime
+from pathlib import Path
 
 from caspian_sdk import CommClient
 from openai import OpenAI
@@ -61,15 +62,26 @@ def run() -> None:
     from policydecoder.router import classify_document
     from policydecoder.supervisor import Supervisor
 
-    async def _router_run(media_urls):
+    async def _router_run(media_urls, input_path=None):
+        if input_path:
+            # Local file → classify via Docling markdown keywords
+            from policydecoder.docling_parser import parse_document
+            from policydecoder.router import heuristic_classify
+
+            parsed = parse_document(Path(input_path))
+            if parsed:
+                label = heuristic_classify(parsed["markdown"])
+                if label in ("HEALTH", "LIFE", "TERM"):
+                    return label, 0.5
+            return "LIFE", 0.0
         label, confidence = classify_document(
             llm, media_urls, model=config.vision_model, fallback_text=""
         )
         return label, confidence
 
     class RouterAgent:
-        async def run(self, media_urls):
-            return await _router_run(media_urls)
+        async def run(self, media_urls, input_path=None):
+            return await _router_run(media_urls, input_path)
 
     supervisor = Supervisor(
         router=RouterAgent(),
