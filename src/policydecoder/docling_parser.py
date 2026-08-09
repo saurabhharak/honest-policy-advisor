@@ -10,7 +10,6 @@ singleton pinning VRAM. Opt-in via DOCLING_ENABLED; lazy import so the
 core app runs without docling installed.
 """
 
-import contextlib
 from pathlib import Path
 from typing import Any
 
@@ -53,9 +52,14 @@ def parse_document(input_path: Path) -> dict[str, Any] | None:
         os.environ.setdefault("TORCHDYNAMO_DISABLE", "1")
         os.environ.setdefault("TORCHINDUCTOR_DISABLE", "1")
 
-        from docling.document_converter import DocumentConverter
+        from docling.datamodel.base_models import InputFormat
+        from docling.document_converter import DocumentConverter, PdfFormatOption
 
-        converter = DocumentConverter()
+        converter = DocumentConverter(
+            format_options={
+                InputFormat.PDF: PdfFormatOption(pipeline_options=_pipeline_options()),
+            }
+        )
         try:
             result = converter.convert(str(input_path))
             parsed = _to_result(result, input_path)
@@ -90,14 +94,10 @@ def _to_result(result, input_path: Path) -> dict[str, Any]:
     if hasattr(doc, "export_to_markdown"):
         markdown = doc.export_to_markdown()
 
-    tables_json: list[Any] = []
-    pages_with_tables: list[int] = []
-    # Docling tables live under document.tables / OCR tables; collect
-    # what's available and record which page each came from.
-    if hasattr(doc, "tables"):
-        for t in doc.tables:
-            with contextlib.suppress(Exception):
-                tables_json.append(t.export_to_dict())
+    # TableFormer tables surface in the markdown as pipe-table blocks in
+    # this Docling version (doc.tables is empty). Parse them out so the
+    # extractor agent can feed structured tables to the table-field LLM.
+    tables_json = _extract_pipe_tables(markdown)
 
     page_count = len(getattr(doc, "pages", [])) or 1
 
@@ -114,8 +114,39 @@ def _to_result(result, input_path: Path) -> dict[str, Any]:
         "tables_json": tables_json,
         "page_images": [],  # populated by the extractor agent if needed
         "page_count": page_count,
-        "pages_with_tables": pages_with_tables,
+        "pages_with_tables": list(range(1, page_count + 1)),
     }
+
+
+def _extract_pipe_tables(markdown: str) -> list[dict[str, Any]]:
+    """Parse markdown pipe-table blocks into structured table dicts.
+
+    A block is consecutive lines starting with '|'. Returns a list of
+    {"header": [...], "rows": [[...], ...]} dicts.
+    """
+    tables: list[dict[str, Any]] = []
+    current: list[list[str]] = []
+
+    def flush() -> None:
+        nonlocal current
+        if len(current) >= 2:  # header + at least one data row
+            header = current[0]
+            rows = current[1:]
+            tables.append({"header": header, "rows": rows})
+        current = []
+
+    for line in markdown.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("|") and stripped.endswith("|"):
+            cells = [c.strip() for c in stripped.strip("|").split("|")]
+            # Skip separator rows (e.g. |---|----|)
+            if cells and all(set(c) <= set("-: ") for c in cells):
+                continue
+            current.append(cells)
+        else:
+            flush()
+    flush()
+    return tables
 
 
 def _pipeline_options() -> Any:

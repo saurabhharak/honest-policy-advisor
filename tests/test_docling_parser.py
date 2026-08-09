@@ -40,7 +40,18 @@ def _fake_docling_module():
     mod = types.ModuleType("docling")
     converter_mod = types.ModuleType("docling.document_converter")
     converter_mod.DocumentConverter = MagicMock()
+    converter_mod.PdfFormatOption = MagicMock()
+    datamodel_mod = types.ModuleType("docling.datamodel")
+    base_models_mod = types.ModuleType("docling.datamodel.base_models")
+    base_models_mod.InputFormat = MagicMock(PDF="pdf")
+    pipeline_opts_mod = types.ModuleType("docling.datamodel.pipeline_options")
+    pipeline_opts_mod.PdfPipelineOptions = MagicMock
+    pipeline_opts_mod.AcceleratorOptions = MagicMock
+    pipeline_opts_mod.AcceleratorDevice = MagicMock(CUDA="cuda", CPU="cpu")
     sys.modules["docling"] = mod
+    sys.modules["docling.datamodel"] = datamodel_mod
+    sys.modules["docling.datamodel.base_models"] = base_models_mod
+    sys.modules["docling.datamodel.pipeline_options"] = pipeline_opts_mod
     sys.modules["docling.document_converter"] = converter_mod
     return converter_mod
 
@@ -133,6 +144,32 @@ class TestParseCache:
         assert r1 is not None and r2 is not None
         # converter.convert called exactly once (cached on the 2nd call)
         assert mock_conv.convert.call_count == 1
+
+
+class TestExtractPipeTables:
+    def test_parses_pipe_table_blocks(self):
+        md = (
+            "| Name | Age |\n"
+            "|------|-----|\n"
+            "| Alice | 30 |\n"
+            "| Bob | 40 |\n"
+            "\n"
+            "Some prose after the table.\n"
+            "| Only header |\n"
+        )
+        tables = docling_parser._extract_pipe_tables(md)
+        assert len(tables) == 1  # the 1-row 'Only header' block is too short
+        assert tables[0]["header"] == ["Name", "Age"]
+        assert tables[0]["rows"] == [["Alice", "30"], ["Bob", "40"]]
+
+    def test_skips_separator_rows(self):
+        md = "| A | B |\n|---|----|\n| 1 | 2 |\n"
+        tables = docling_parser._extract_pipe_tables(md)
+        assert len(tables) == 1
+        assert "---" not in str(tables)
+
+    def test_no_tables_returns_empty(self):
+        assert docling_parser._extract_pipe_tables("just prose here") == []
 
 
 class TestGpu:
