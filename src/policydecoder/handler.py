@@ -3,6 +3,7 @@
 Never branches on channel type. The SDK handles routing via message.reply().
 """
 
+import contextlib
 import json
 from datetime import UTC, date, datetime
 
@@ -78,10 +79,36 @@ def handle(
 
 
 def _handle_media_supervisor(message, supervisor, media):
-    """Route media through the multi-agent supervisor pipeline."""
-    import asyncio
+    """Route media through the multi-agent supervisor pipeline.
 
-    media_urls = [m.get("url") for m in media if m.get("url")]
+    Materializes the attachment to a local file (from url or base64 data)
+    so Docling can parse it, then runs the supervisor.
+    """
+    import asyncio
+    import base64
+    import tempfile
+    from pathlib import Path
+
+    input_path = None
+    media_urls = []
+    for m in media:
+        url = m.get("url")
+        data = m.get("data")
+        if data:
+            # Attachment delivered as base64 data → write to temp file
+            suffix = Path(m.get("name") or "media.bin").suffix or ".pdf"
+            try:
+                raw = base64.b64decode(data)
+            except Exception:
+                raw = data.encode("utf-8")
+            fd, tmp = tempfile.mkstemp(suffix=suffix)
+            with open(fd, "wb") as f:
+                f.write(raw)
+            input_path = tmp
+            media_urls.append(f"file://{tmp}")
+        elif url:
+            media_urls.append(url)
+
     if not media_urls:
         message.reply("I received an attachment but couldn't read it. Could you try again?")
         return
@@ -91,9 +118,14 @@ def _handle_media_supervisor(message, supervisor, media):
         supervisor.process_media(
             media_urls=media_urls,
             conversation_id=message.conversation_id,
-            channel="unknown",
+            channel=message.channel if hasattr(message, "channel") else "unknown",
+            input_path=input_path,
         )
     )
+    if input_path:
+        with contextlib.suppress(OSError):
+            Path(input_path).unlink(missing_ok=True)
+
     if result.get("reply"):
         message.reply(result["reply"])
         return

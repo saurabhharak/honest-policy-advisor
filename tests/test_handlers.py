@@ -325,3 +325,38 @@ class TestCorrelationId:
             handle(client, msg, extractor, analyzer)
 
         assert get_correlation_id() == "conv-xyz"
+
+
+class TestBase64Media:
+    def test_base64_attachment_written_to_temp_and_passed(self):
+        """A base64-data attachment is materialized and passed to the supervisor."""
+        import base64
+
+        client = _make_client()
+        pdf_bytes = b"%PDF-1.4 dummy"
+        msg = FakeMessage(
+            text="",
+            media=[
+                {
+                    "data": base64.b64encode(pdf_bytes).decode("ascii"),
+                    "name": "policy.pdf",
+                    "mime_type": "application/pdf",
+                }
+            ],
+        )
+        extractor = FakeExtractor()
+        analyzer = FakeAnalyzer()
+        supervisor = MagicMock()
+
+        async def fake_process(media_urls, conversation_id="", channel="unknown", input_path=None):
+            supervisor.process_media_called_with_input_path = input_path is not None
+            return {"data": {"policy_name": "Test"}, "analysis": {"summary": "ok"}}
+
+        supervisor.process_media = fake_process
+
+        with patch.object(guardrails, "is_enabled", return_value=False):
+            handle(client, msg, extractor, analyzer, supervisor=supervisor)
+
+        assert len(msg.replies) >= 1
+        # The supervisor got a local input_path (temp file), not just URLs
+        assert supervisor.process_media_called_with_input_path is True
