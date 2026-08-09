@@ -43,16 +43,19 @@ class Supervisor:
         media_urls: list[str],
         conversation_id: str = "",
         channel: str = "unknown",
+        input_path: str | None = None,
     ) -> dict[str, Any]:
         set_correlation_id(conversation_id)
         start_trace(conversation_id, channel)
 
         # Router decides the document type.
-        label, confidence = await self._classify(media_urls)
+        label, confidence = await self._classify(media_urls, input_path)
         document_type = label if label in ("HEALTH", "LIFE") else "LIFE"
 
         # Fan out independent agents in parallel.
-        extract_task = self.extractor.run(media_urls=media_urls, document_type=document_type)
+        extract_task = self.extractor.run(
+            media_urls=media_urls, document_type=document_type, input_path=input_path
+        )
         research_task = self.researcher.run(topic=self._research_topic(document_type))
         extraction, findings = await asyncio.gather(extract_task, research_task)
 
@@ -79,12 +82,14 @@ class Supervisor:
         """Route a text-only message (question, status, etc.)."""
         return {"reply": None, "text": text}
 
-    async def _classify(self, media_urls: list[str]) -> tuple[str, float]:
+    async def _classify(
+        self, media_urls: list[str], input_path: str | None = None
+    ) -> tuple[str, float]:
         """Ask the router agent. Falls back to LIFE on failure."""
         if self.router is None:
             return "LIFE", 0.0
         try:
-            label, confidence = await self.router.run(media_urls=media_urls)
+            label, confidence = await self.router.run(media_urls=media_urls, input_path=input_path)
             return label, confidence
         except Exception as e:
             self.logger.warning("Router failed, defaulting to LIFE: %s", e)

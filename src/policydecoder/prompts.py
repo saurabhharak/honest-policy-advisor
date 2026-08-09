@@ -36,6 +36,46 @@ Respond with ONLY a JSON object:
 - false: the data is NOT in this document — do not waste another read.
 """
 
+DOCLING_TEXT_EXTRACTION_PROMPT = """You are extracting insurance policy fields from machine-parsed document text (Docling output).
+
+Extract these TEXT fields and return ONLY a JSON object:
+{{
+    "policy_name": "string or null",
+    "insurer": "string or null",
+    "annual_premium": "number or null",
+    "policy_start_date": "string or null (YYYY-MM-DD)",
+    "policy_term_years": "number or null",
+    "premium_term_years": "number or null",
+    "free_look_period_days": "number or null"
+}}
+
+Use the document text below. If a field is not present, use null. Do not guess or invent values.
+The accuracy of premium, term, and dates is critical.
+
+== DOCUMENT TEXT ==
+{document_text}"""
+
+
+DOCLING_TABLE_EXTRACTION_PROMPT = """You are extracting insurance policy fields from structured table data (TableFormer output).
+
+Extract these TABLE fields and return ONLY a JSON object:
+{{
+    "sum_insured": "number or null",
+    "sum_assured": "number or null",
+    "maturity_value_at_4pct": "number or null",
+    "maturity_value_at_8pct": "number or null",
+    "surrender_value_table": "string or null (the surrender value schedule as text)",
+    "room_rent_cap": "string or null (e.g. 'no cap', '₹5,000/day')",
+    "co_pay_pct": "number or null",
+    "network_hospitals_count": "number or null"
+}}
+
+Use the structured tables below. If a field is not present, use null. Do not guess or invent values.
+
+== TABLE DATA ==
+{table_data}"""
+
+
 HEALTH_EXTRACTION_PROMPT = """Read this health insurance policy document page carefully.
 
 Extract the following fields and return ONLY a JSON object:

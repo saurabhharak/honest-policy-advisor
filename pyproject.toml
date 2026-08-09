@@ -39,6 +39,9 @@ guardrails = [
 observability = [
     "opik>=1.0.0",
 ]
+docling = [
+    "docling[easyocr]>=2.115.0",
+]
 
 [project.scripts]
 policydecoder = "policydecoder.main:run"

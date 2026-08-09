@@ -34,6 +34,8 @@ class Config:
     opik_enabled: bool
     opik_url: str
     opik_api_key: str
+    docling_enabled: bool
+    docling_text_model: str
 
 
 _config: Config | None = None
@@ -58,5 +60,8 @@ def get_config() -> Config:
             opik_enabled=os.getenv("OPIK_ENABLED", "").strip().lower() in ("1", "true", "yes"),
             opik_url=_optional("OPIK_URL", ""),
             opik_api_key=_optional("OPIK_API_KEY", ""),
+            docling_enabled=os.getenv("DOCLING_ENABLED", "").strip().lower()
+            in ("1", "true", "yes"),
+            docling_text_model=_optional("DOCLING_TEXT_MODEL", llm_model),
         )
     return _config

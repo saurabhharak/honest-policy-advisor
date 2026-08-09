@@ -1,0 +1,59 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [4 0 R 5 0 R 6 0 R] /Count 3 >>
+endobj
+3 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+4 0 obj
+<< /Length 266 >>
+stream
+BT /F1 12 Tf 50 750 Td 14 TL
+(Health Insurance Policy - Sample Plan) Tj T*
+(Policy Name: Sample Health Secure) Tj T*
+(Insurer: Sample Health Insurance) Tj T*
+(Annual Premium: Rs 18,000) Tj T*
+(Sum Insured: Rs 15,00,000) Tj T*
+(Policy Start Date: 2024-01-01) Tj T*
+ET
+endstream
+endobj
+5 0 obj
+<< /Length 217 >>
+stream
+BT /F1 12 Tf 50 750 Td 14 TL
+(Room Rent Cap: No cap) Tj T*
+(Co-pay: 10%) Tj T*
+(Waiting Period: 30 days \(accident\), 3 years \(pre-existing\)) Tj T*
+(Restoration: Unlimited) Tj T*
+(Network Hospitals: 12,000) Tj T*
+ET
+endstream
+endobj
+6 0 obj
+<< /Length 158 >>
+stream
+BT /F1 12 Tf 50 750 Td 14 TL
+(Exclusions: Maternity, Pre-existing) Tj T*
+(Free Look Period: 15 days) Tj T*
+(This is a dummy policy for testing only.) Tj T*
+ET
+endstream
+endobj
+xref
+0 7
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000127 00000 n 
+0000000197 00000 n 
+0000000514 00000 n 
+0000000782 00000 n 
+trailer
+<< /Size 7 /Root 1 0 R >>
+startxref
+991
+%%EOF
