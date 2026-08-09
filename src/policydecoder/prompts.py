@@ -16,6 +16,26 @@ Respond with ONLY a JSON object:
 If you cannot tell from the first page, use UNKNOWN with low confidence."""
 
 
+EXTRACTOR_TRIAGE_PROMPT = """You are helping decide whether to re-read a policy document page.
+
+We extracted the following fields from the document, but these required fields are missing:
+{missing_fields}
+
+Here is what was already extracted:
+{extracted_content}
+
+Look carefully at the extracted content. Decide: does the missing data actually EXIST anywhere in the provided document pages, or is it simply not in the document at all (e.g., the user uploaded only a receipt or a marketing brochure, not the full policy)?
+
+Respond with ONLY a JSON object:
+{{
+    "data_exists_in_document": true/false,
+    "reason": "short explanation"
+}}
+
+- true: the data likely exists on a page we haven't read correctly — re-read.
+- false: the data is NOT in this document — do not waste another read.
+"""
+
 HEALTH_EXTRACTION_PROMPT = """Read this health insurance policy document page carefully.
 
 Extract the following fields and return ONLY a JSON object:

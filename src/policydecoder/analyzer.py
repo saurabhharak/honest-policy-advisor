@@ -141,11 +141,13 @@ class PolicyAnalyzer:
         policy_flags: str,
         insurer_metrics: str,
         overall: str,
+        research_findings: str = "",
     ) -> dict[str, Any]:
         """Analyze a health policy from pre-computed flags and benchmarks.
 
         All numbers and flags come from health_calculator.py. The LLM only
-        writes the honest narrative verdict.
+        writes the honest narrative verdict. research_findings (optional)
+        are whitelisted Researcher sources appended to the prompt.
         """
         prompt = HEALTH_ANALYSIS_PROMPT.format(
             extracted_json=extracted_json,
@@ -153,6 +155,8 @@ class PolicyAnalyzer:
             insurer_metrics=insurer_metrics,
             overall=overall,
         )
+        if research_findings:
+            prompt += "\n\n== RESEARCH FINDINGS (whitelisted sources) ==\n" + research_findings
         result = self._generate(SYSTEM_PROMPT, prompt, timeout=20.0)
         parsed = parse_json_response(result)
         if parsed and "verdict" in parsed:

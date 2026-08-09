@@ -51,6 +51,39 @@ def run() -> None:
     extractor = PolicyExtractor(llm)
     analyzer = PolicyAnalyzer(llm)
 
+    # Build the multi-agent pipeline (supervisor + specialists).
+    from policydecoder.agents.extractor_agent import ExtractorAgent
+    from policydecoder.agents.health_analyst import HealthAnalyst
+    from policydecoder.agents.letter_drafter import LetterDrafter
+    from policydecoder.agents.life_analyst import LifeAnalyst
+    from policydecoder.agents.researcher_agent import ResearcherAgent
+    from policydecoder.insurer_data import get_insurer_metrics
+    from policydecoder.router import classify_document
+    from policydecoder.supervisor import Supervisor
+
+    async def _router_run(media_urls):
+        label, confidence = classify_document(
+            llm, media_urls, model=config.vision_model, fallback_text=""
+        )
+        return label, confidence
+
+    class RouterAgent:
+        async def run(self, media_urls):
+            return await _router_run(media_urls)
+
+    supervisor = Supervisor(
+        router=RouterAgent(),
+        extractor=ExtractorAgent(extractor=extractor, llm_client=llm),
+        researcher=ResearcherAgent(llm_client=llm),
+        health_analyst=HealthAnalyst(
+            llm_client=llm,
+            analyzer=analyzer,
+            benchmark_lookup=get_insurer_metrics,
+        ),
+        life_analyst=LifeAnalyst(llm_client=llm, analyzer=analyzer),
+        letter_drafter=LetterDrafter(llm_client=llm, analyzer=analyzer),
+    )
+
     from policydecoder.store import Persistence
 
     store = Persistence()
@@ -59,7 +92,7 @@ def run() -> None:
 
     @client.on_message
     def on_message(message):
-        handle(client, message, extractor, analyzer)
+        handle(client, message, extractor, analyzer, supervisor=supervisor)
 
     client.listen(ack="Policy Decoder is analyzing your message...")
 

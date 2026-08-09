@@ -53,8 +53,13 @@ def handle(
     message,
     extractor: PolicyExtractor,
     analyzer: PolicyAnalyzer,
+    supervisor=None,
 ):
-    """Single handler for all channels."""
+    """Single handler for all channels.
+
+    When a Supervisor is provided, media messages are routed through the
+    multi-agent pipeline. Otherwise the legacy linear flow is used.
+    """
     conversation_id = message.conversation_id
     sender = (message.sender or {}).get("address", "anonymous")
     text = (message.text or "").strip()
@@ -64,9 +69,61 @@ def handle(
     set_correlation_id(conversation_id)
     set_trace_metadata(conversation_id, channel="unknown")
     try:
+        if media and supervisor is not None:
+            _handle_media_supervisor(message, supervisor, media)
+            return
         _handle_inner(client, message, extractor, analyzer, conversation_id, sender, text, media)
     finally:
         flush()
+
+
+def _handle_media_supervisor(message, supervisor, media):
+    """Route media through the multi-agent supervisor pipeline."""
+    import asyncio
+
+    media_urls = [m.get("url") for m in media if m.get("url")]
+    if not media_urls:
+        message.reply("I received an attachment but couldn't read it. Could you try again?")
+        return
+
+    message.typing()
+    result = asyncio.run(
+        supervisor.process_media(
+            media_urls=media_urls,
+            conversation_id=message.conversation_id,
+            channel="unknown",
+        )
+    )
+    if result.get("reply"):
+        message.reply(result["reply"])
+        return
+
+    data = result.get("data", {})
+    analysis = result.get("analysis", {})
+    reply = _format_supervisor_report(data, analysis)
+    message.reply(reply)
+
+
+def _format_supervisor_report(data: dict, analysis: dict) -> str:
+    """Format the supervisor's analysis into a user reply."""
+    parts = ["Here's my honest take:\n"]
+    if data.get("policy_name"):
+        parts.append(f"Policy: {data['policy_name']}")
+    if data.get("sum_insured"):
+        parts.append(f"Sum insured: ₹{data['sum_insured']:,.0f}")
+    if data.get("annual_premium"):
+        parts.append(f"Annual premium: ₹{data['annual_premium']:,.0f}")
+    if analysis.get("summary"):
+        parts.append(f"\n{analysis['summary']}")
+    if analysis.get("red_flags"):
+        parts.append("\nRed flags:")
+        for flag in analysis["red_flags"]:
+            parts.append(f"  - {flag}")
+    parts.append(
+        "\nBased on IRDAI FY2024-25 public data and live research where available. "
+        "This is an honest assessment, not a recommendation to buy or cancel."
+    )
+    return "\n".join(parts)
 
 
 def _handle_inner(client, message, extractor, analyzer, conversation_id, sender, text, media):
