@@ -1,12 +1,12 @@
-# Engineering rules for policy-decoder
+# Engineering rules for honest-policy-advisor
 
-These are the rules every line of code in this project follows. They're not aspirational. They exist because we've seen what breaks during a demo.
+These are the rules every line of code in this project follows. They exist because we've seen what breaks during a demo — and what breaks in production.
 
 ## The agent harness pattern
 
 The LLM proposes. The harness executes. This is the most important rule in the project.
 
-The LLM reads a policy PDF and says "this looks like a ULIP with a 4% premium allocation charge and a 5-year lock-in." The harness takes that finding and decides what to do with it. The LLM never sends a message, never calls an API, never writes to the database.
+The LLM reads a policy and says "this looks like a ULIP with a 4% premium allocation charge." The harness takes that finding and decides what to do with it. The LLM never sends a message, never calls an API, never writes to the database.
 
 ```
 BAD:  LLM → calls send_email() → email sent
@@ -15,7 +15,7 @@ GOOD: LLM → "this is mis-sold, draft a complaint" → harness validates → ha
 
 ## The LLM never does math
 
-XIRR, compound interest, surrender value calculations, SIP projections. None of this touches the LLM. All of it lives in calculator.py as pure Python functions.
+XIRR, compound interest, surrender value, SIP projections, room-rent-cap flags. None of this touches the LLM. All of it lives in `calculator.py` / `health_calculator.py` as pure Python functions.
 
 Why: LLMs hallucinate numbers. A hallucinated surrender value that's 10% too high is terrible financial advice. A Python function with the same inputs gives the same output every time.
 
@@ -28,104 +28,131 @@ GOOD: calculator.xirr(cash_flows) → 0.038 → passed to LLM for the report
 
 | Module | Its one job | What it does NOT do |
 |---|---|---|
-| handler.py | Route messages to intents | Manage state, generate content, do math |
-| extractor.py | Read PDFs via vision model, return JSON | Analyze, calculate, draft letters |
-| calculator.py | Financial math (XIRR, comparisons) | LLM calls, message sending, state |
-| analyzer.py | LLM analysis + letter drafting | Math, PDF parsing, state management |
-| case_manager.py | State machine + storage | Send messages, call LLM |
-| store.py | SQLite persistence | Business logic |
-| prompts.py | Prompt templates | Any logic at all |
-| config.py | Environment variables | Anything else |
+| `handler.py` | Route messages; materialize attachments | Analyze, calculate, draft letters |
+| `supervisor.py` | Orchestrate agents; fan out parallel work | Do math, generate content |
+| `agents/extractor_agent.py` | Parse + extract fields; short-circuit on missing data | Analyze, draft letters |
+| `agents/researcher_agent.py` | Fetch whitelisted sources; summarize | Compute policy numbers |
+| `agents/health_analyst.py` / `life_analyst.py` | Write honest verdict from computed data | Do math |
+| `agents/letter_drafter.py` | Draft letters | Analyze |
+| `docling_parser.py` | PDF → markdown/tables (per-parse lifecycle) | Anything else |
+| `calculator.py` / `health_calculator.py` | Pure financial math | LLM calls, state |
+| `case_manager.py` | State machine | Send messages, call LLM |
+| `store.py` | SQLite persistence | Business logic |
+| `guardrails.py` | Input/output safety rails | Anything else |
+| `opik_tracing.py` / `logging.py` | Observability | Business logic |
+| `prompts.py` | Prompt templates | Any logic at all |
+| `config.py` | Environment variables | Anything else |
 
-## Open/closed state router
+## Multi-agent orchestration
 
-The handler routes via a dict, not if/elif chains. Adding a new state means adding a new handler function and registering it. The router code doesn't change.
+The supervisor is the orchestrator. It:
+
+1. **Classifies** the document (Router → HEALTH/LIFE/TERM).
+2. **Fans out independent agents in parallel** (`asyncio.gather`) — e.g. Extractor + Researcher run concurrently, cutting end-to-end latency.
+3. **Runs dependent agents sequentially** — the analyst waits for both, the drafter waits for the verdict.
+4. **Sets correlation ID + starts the Opik trace** per message, so every agent's spans nest under one trace.
 
 ```python
-STATE_ROUTER = {
-    CaseState.POLICY_RECEIVED: handle_policy_received,
-    CaseState.ANALYZED: handle_analyzed,
-    # New states go here, nowhere else
-}
+# Fan out independent work — never run these serially
+extract_task = self.extractor.run(...)
+research_task = self.researcher.run(...)
+extraction, findings = await asyncio.gather(extract_task, research_task)
 ```
+
+## Short-circuit extraction (no retry loops)
+
+The extractor agent never burns retries confirming data isn't there. After the first pass, a triage LLM returns `{"data_exists_in_document": false}` and the agent **short-circuits** — returning partial data + a missing list to the supervisor, which replies "I need the full policy document." Hard cap: **1 retry**.
+
+This handles the real case where a user uploads a premium receipt or a 2-page brochure instead of the full 40-page policy.
+
+## Document routing (Gap-free input handling)
+
+- `.pdf` → **Docling** (layout + TableFormer tables + OCR) → text-LLM over markdown, table-LLM over tables JSON, vision only as single-page fallback.
+- `.jpg/.jpeg/.png` (photos) → **bypass Docling**, go straight to the vision path (a 3GB model pipeline is overkill for one photo).
+- Unknown → vision fast path.
+
+## The LLM never sends messages
+
+Only `handler.py` calls `message.reply()`. No agent touches channels directly. The SDK routes to the correct channel automatically.
 
 ## Channel-agnostic core
 
-extractor.py, calculator.py, analyzer.py, and case_manager.py have zero awareness of whether the user is on email or Telegram. Only handler.py and alert_system.py touch channels, and they use message.reply() which the SDK routes automatically.
+The agents, calculators, and state have zero awareness of whether the user is on email or Telegram. Only `handler.py` touches channels, via `message.reply()` which the SDK routes.
 
 No branching on channel type. Ever.
 
-## Fail fast
+## Fail fast, fail honestly
 
-If the vision model can't extract the surrender value table, we ask the user for it directly. If the XIRR calculation gets bad inputs, we return an error and ask for clarification. If the LLM's confidence is below 0.7, we ask the user to rephrase.
+- If extraction is partial, the agent says exactly what's missing and asks for it.
+- If the document isn't a policy (receipt, brochure), the agent says so.
+- If the data is genuinely insufficient, the verdict says "not enough data to determine" — it never fabricates a conclusion.
 
-Silent failures kill demos. Loud failures get fixed before the demo.
+Silent failures kill demos. Loud, honest failures get fixed before the demo.
 
-## In-memory state with SQLite backup
+## State
 
-A dict in memory is the primary store. SQLite is the backup that survives restarts. No Redis, no Postgres, no vector database. The demo runs for 3 minutes. A dict is fine.
+SQLite via `store.py`, managed by `case_manager.py`. The Caspian SDK provides **no agent-state API** — it's a channel/messaging SDK (`connect_*`, `on_message`, `reply`, `list_conversations`, `backfill`, `events`). Our own state layer is the correct choice; `list_messages`/`backfill` can rebuild conversation state on restart.
 
-Post-hackathon, swap case_manager.py for a real database. Zero other files change.
+## Safety rails (guardrails)
 
-## One LLM, two roles
+- **Input rails** on user text AND policy-document text (a crafted PDF can contain prompt injection — the most dangerous surface).
+- **Output rail** on drafted letters: disclaimer appended, overpromising claim language sanitized.
+- Blocking raises `GuardrailValidationError` (never a sentinel string); the handler catches it and replies safely without invoking downstream models.
+- Rails are **opt-in** via `GUARDRAILS_ENABLED` — zero latency when off.
 
-One model for intent classification and content generation. Not two models, not a multi-agent swarm. If classification is too slow or expensive, switch to a cheaper model for that one call. That's a one-line change.
+## Observability
+
+- **Opik** (opt-in): every LLM call traced with inputs/outputs/model; one trace per message with nested spans per agent.
+- **Structured logging**: every record carries the conversation's correlation ID via a contextvar; third-party loggers are tolerated by `SafeFormatter`.
 
 ## Tests are written first
 
 Every feature starts as a failing test. The test defines the contract. Then we write the minimum code to make it pass.
 
-Tests never call the real LLM, real channels, or real timers. conftest.py has fakes for all three.
+Tests never call the real LLM, real channels, or real timers. `conftest.py` has fakes for all three, and autouse fixtures force guardrails/opik/docling **off** so the suite never hits the network.
 
 Run `uv run pytest` before any commit. If it's red, the commit doesn't happen.
 
-## What we deliberately skip
+## CI & quality gates
 
-- Web dashboard (the demo is terminal + two channels)
-- Multi-tenant support (one user per demo)
-- PDF generation for reports (plain text is fine)
-- Rate limiting (single user, demo context)
-- Custom email domain (free instant inbox works)
-- Scheduled background jobs (demo simulates time passing)
+Every push/PR runs (`.github/workflows/ci.yml`):
 
-If removing it doesn't break the 3-minute demo, we don't build it.
-
-## Observability
-
-Every action gets logged with structured data:
-
-```
-[2026-08-09T14:30:00] CASE:conv_abc123 ACTION:STATE_CHANGE POLICY_RECEIVED → ANALYZED
-[2026-08-09T14:30:01] CASE:conv_abc123 ACTION:EXTRACTION policy_name=LIC_Jeevan_Anand premium=50000
-[2026-08-09T14:30:02] CASE:conv_abc123 ACTION:CALCULATION xirr=0.038 comparison_sip=0.112
-[2026-08-09T14:30:03] CASE:conv_abc123 ACTION:MESSAGE_SENT email, 1200 chars, complaint draft
+```bash
+uv run ruff check src tests scripts   # lint
+uv run ruff format --check src tests scripts  # format
+uv run mypy src/policydecoder          # types
+uv run pytest -q                      # tests
 ```
 
-When the demo breaks during rehearsal, these logs say exactly where.
+Pre-commit hooks enforce the same locally.
 
 ## Anti-patterns we reject
 
 | Pattern | Why not |
 |---|---|
 | LLM calls tools directly | Security risk. Harness gates all execution. |
-| Bare except Exception | Hides bugs that kill the demo. Catch specific errors. |
-| Channel branching in handler | Defeats the SDK. Use behavior_prompt() for tone. |
-| Giant system prompt | Leads to unpredictable behavior. Use structured prompts. |
-| execute_anything tool | Never. Every action is a purpose-built function. |
-| LLM doing arithmetic | Hallucination risk. Python does math. |
+| LLM does arithmetic | Hallucination risk. Python does math. |
+| Persistent Docling converter singleton | Pins 4GB+ VRAM. Per-parse lifecycle + `torch.cuda.empty_cache()`. |
+| Full document in one LLM prompt | Context blowout. Chunked text + structured tables + single-page vision fallback. |
+| Researcher citing any domain | Fact-drift. Whitelist enforced at the Python layer. |
+| Retry loops on missing extraction | Wastes vision calls. Short-circuit on triage. |
+| Channel branching in handler | Defeats the SDK. Use `message.reply()`. |
+| Bare `except Exception` | Hides bugs. Catch specific errors. |
 
 ## Quick reference
 
 ```python
 # DO
-message.reply(text)                              # SDK routes to correct channel
-case = case_manager.get(conversation_id)         # state via manager
-result = calculator.xirr(cash_flows)             # Python for math
-draft = analyzer.draft_complaint(extracted, calc) # LLM for text
+message.reply(text)                                  # SDK routes to correct channel
+case = case_manager.get(conversation_id)             # state via manager
+result = calculator.xirr(cash_flows)                 # Python for math
+analysis = await supervisor.process_media(urls, input_path=...)  # orchestrator
+parsed = docling_parser.parse_document(path)          # PDF → markdown/tables
 
 # DON'T
-if message.channel == "email": ...               # no channel branching
-case["policy_name"] = ...                         # no direct mutation
-llm.call_tool("send_email", ...)                  # LLM never sends
-raise Exception("broke")                          # catch specific errors
+if message.channel == "email": ...                    # no channel branching
+converter = DocumentConverter()  # module-level          # no GPU singleton
+result = llm.analyze_policy(extract(pdf))            # no math in LLM
+llm.call_tool("send_email", ...)                     # LLM never sends
+raise Exception("broke")                             # catch specific errors
 ```

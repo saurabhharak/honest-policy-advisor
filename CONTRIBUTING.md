@@ -16,10 +16,10 @@ uv run pre-commit install
 
 ```bash
 # Lint + auto-fix
-uv run ruff check src tests --fix
+uv run ruff check src tests scripts --fix
 
 # Format
-uv run ruff format src tests
+uv run ruff format src tests scripts
 
 # Type check
 uv run mypy src/policydecoder
@@ -37,13 +37,23 @@ CI runs all four on every push/PR. Make them pass locally first.
 - **The LLM never sends messages.** Only `handler.py` replies via `message.reply()`.
 - **No channel branching.** The one `on_message` handler routes automatically; do not add email-vs-Telegram branches.
 - **Pure functions for logic.** New scoring/calculation functions take plain numbers and return plain results — no I/O, no LLM calls.
+- **One agent, one responsibility.** Specialist agents live in `src/policydecoder/agents/`, extend `BaseAgent`, and never touch each other's concerns. The supervisor orchestrates; agents don't call each other directly.
+- **Short-circuit extraction.** The extractor agent never burns retries confirming data is absent — triage short-circuits and returns a missing list.
+- **Researcher cites only whitelisted domains** (`irdai.gov.in`, `joinditto.in`, `beshak.org`), enforced at the Python layer.
 
 ## Adding a new analysis metric
 
 1. Write tests for the pure function in `tests/test_health_calculator.py` (or `test_calculator.py` for life).
 2. Implement it in the corresponding module.
-3. Wire it into `score_health_policy` / the handler report.
+3. Wire it into `score_health_policy` / the supervisor's analyst call.
 4. Run the full suite + lint + mypy.
+
+## Adding a new specialist agent
+
+1. Create `src/policydecoder/agents/<name>_agent.py` extending `BaseAgent`.
+2. Write its `run()` tests first (mock the LLM — never hit a real model).
+3. Wire it into `Supervisor` (add it to `process_media` or fan it out in `asyncio.gather`).
+4. Register it in `main.py`'s supervisor construction.
 
 ## Insurer benchmark data
 
