@@ -72,7 +72,22 @@ fix when someone does the wrong thing:
 | Mistake | Hook | What it tells you |
 |---|---|---|
 | Committing directly to `master` | `pre-commit` → `no-commit-on-master` | Create a `feat/…`/`fix/…` branch and commit there. |
+| Committing in detached HEAD (e.g. after `git checkout v0.1.0`) | `pre-commit` → `no-commit-on-detached-head` | `git switch -c hotfix/v0.1.x v0.1.0` first — never commit on a tag. |
 | Force-pushing `master` (history rewrite) | `pre-push` → `no-force-push-master` | Never force-push shared branches; use `git revert` instead. |
+
+### Limitations (honest list)
+
+Pre-commit hooks are **local and advisory**:
+
+- They only run for people who installed them
+  (`uv run pre-commit install --hook-type pre-commit --hook-type pre-push`).
+- `git commit --no-verify` bypasses them.
+- A tag's own tree predates the hooks — checking out `v0.1.0` and committing
+  there won't find the hook files in that tree. The detached-HEAD hook only
+  protects you when your *working tree* has it (i.e. you checked out a branch
+  that contains it).
+- The hard enforcement for a shared repo is **CI + remote branch rules**
+  (protected `master`, required PRs, force-push disabled on the remote).
 
 Install with:
 
