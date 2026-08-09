@@ -5,10 +5,20 @@ import types
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from policydecoder import docling_parser
-from policydecoder.docling_parser import is_enabled, parse_document
+from policydecoder.docling_parser import parse_document
 
 DUMMY_PDF = Path(__file__).parent / "assets" / "dummy_policy.pdf"
+
+
+@pytest.fixture(autouse=True)
+def clear_parse_cache():
+    """The module-level parse cache must not leak between tests."""
+    docling_parser._PARSE_CACHE.clear()
+    yield
+    docling_parser._PARSE_CACHE.clear()
 
 
 class TestPortableAsset:
@@ -20,8 +30,9 @@ class TestPortableAsset:
 
 class TestIsEnabled:
     def test_disabled_by_default(self):
+        # .env has DOCLING_ENABLED=true; tests force it off via the patch
         with patch.object(docling_parser, "is_enabled", return_value=False):
-            assert is_enabled() is False
+            assert docling_parser.is_enabled() is False
 
 
 def _fake_docling_module():
@@ -98,6 +109,30 @@ class TestParseDocument:
             parse_document(DUMMY_PDF)
 
         mock_free.assert_called_once()  # _free_gpu (empty_cache) called
+
+
+class TestParseCache:
+    def test_parse_cached_across_calls(self):
+        """Two parse calls for the same file reuse one Docling run."""
+        mock_doc = MagicMock()
+        mock_doc.export_to_markdown.return_value = "cached"
+        mock_doc.pages = [MagicMock()]
+        mock_doc.tables = []
+
+        converter_mod = _fake_docling_module()
+        mock_conv = MagicMock()
+        mock_conv.convert.return_value = MagicMock(document=mock_doc)
+        converter_mod.DocumentConverter.return_value = mock_conv
+
+        with (
+            patch.object(docling_parser, "is_enabled", return_value=True),
+            patch.object(docling_parser, "_free_gpu"),
+        ):
+            r1 = parse_document(DUMMY_PDF)
+            r2 = parse_document(DUMMY_PDF)
+        assert r1 is not None and r2 is not None
+        # converter.convert called exactly once (cached on the 2nd call)
+        assert mock_conv.convert.call_count == 1
 
 
 class TestGpu:

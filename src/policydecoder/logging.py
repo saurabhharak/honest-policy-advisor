@@ -14,6 +14,20 @@ _correlation_id: ContextVar[str] = ContextVar("correlation_id", default="")
 _FORMAT = "%(asctime)s %(levelname)-7s %(name)s [cid=%(correlation_id)s] %(message)s"
 
 
+class SafeFormatter(logging.Formatter):
+    """Formatter that tolerates records missing the correlation_id attr.
+
+    Our CorrelationIdFilter sets it on our own loggers, but third-party
+    loggers (e.g. opik/httpx) reach the root handler too — those records
+    lack the attribute and would otherwise crash formatting.
+    """
+
+    def format(self, record: logging.LogRecord) -> str:
+        if not hasattr(record, "correlation_id"):
+            record.correlation_id = ""
+        return super().format(record)
+
+
 class CorrelationIdFilter(logging.Filter):
     """Injects the current correlation ID into every log record."""
 
@@ -49,7 +63,7 @@ def configure_logging(level: int = logging.INFO) -> None:
     if _configured:
         return
     handler = logging.StreamHandler()
-    handler.setFormatter(logging.Formatter(_FORMAT))
+    handler.setFormatter(SafeFormatter(_FORMAT))
     root = logging.getLogger()
     root.addHandler(handler)
     root.setLevel(level)

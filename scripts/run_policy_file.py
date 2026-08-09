@@ -28,25 +28,33 @@ logger = get_logger("policydecoder.scripts.run_policy_file")
 
 
 async def main(pdf_path: str) -> None:
+    # Windows console uses cp1252 by default; the analysis contains ₹.
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+
     configure_logging()
     config = get_config()
     llm = OpenAI(api_key=config.openai_api_key, base_url=config.openai_base_url)
     extractor = PolicyExtractor(llm)
 
-    from policydecoder.router import classify_document
+    from policydecoder.docling_parser import parse_document
+    from policydecoder.router import heuristic_classify
 
     class RouterAgent:
         async def run(self, media_urls, input_path=None):
-            # For a local file we default to LIFE unless Docling tells us otherwise.
-            return ("LIFE", 0.5)
+            """Classify a local PDF via Docling markdown keywords."""
+            if input_path:
+                parsed = parse_document(Path(input_path))
+                if parsed:
+                    label = heuristic_classify(parsed["markdown"])
+                    if label in ("HEALTH", "LIFE"):
+                        return (label, 0.5)
+            return ("LIFE", 0.0)
 
     supervisor = Supervisor(
         router=RouterAgent(),
         extractor=ExtractorAgent(extractor=extractor, llm_client=llm),
         researcher=ResearcherAgent(llm_client=llm),
-        health_analyst=HealthAnalyst(
-            llm_client=llm, benchmark_lookup=get_insurer_metrics
-        ),
+        health_analyst=HealthAnalyst(llm_client=llm, benchmark_lookup=get_insurer_metrics),
         life_analyst=LifeAnalyst(llm_client=llm),
         letter_drafter=None,
     )
@@ -56,7 +64,9 @@ async def main(pdf_path: str) -> None:
     print()
 
     result = await supervisor.process_media(
-        media_urls=[], conversation_id="local-file-test", channel="file",
+        media_urls=[],
+        conversation_id="local-file-test",
+        channel="file",
         input_path=pdf_path,
     )
     print(json.dumps(result, indent=2, ensure_ascii=False, default=str))

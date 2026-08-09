@@ -68,3 +68,36 @@ class TestConfigureLogging:
         # Should not raise; callable multiple times
         configure_logging(level=logging.WARNING)
         configure_logging(level=logging.DEBUG)
+
+
+class TestSafeFormatter:
+    def test_formats_record_without_correlation_id(self):
+        """Third-party records (no correlation_id attr) must not crash."""
+        formatter = pd_logging.SafeFormatter(pd_logging._FORMAT)
+        record = logging.LogRecord(
+            name="httpx",
+            level=logging.INFO,
+            pathname=__file__,
+            lineno=1,
+            msg="hello from httpx",
+            args=(),
+            exc_info=None,
+        )
+        output = formatter.format(record)  # must not raise KeyError
+        assert "hello from httpx" in output
+        assert "cid=" in output
+
+    def test_formats_record_with_correlation_id(self):
+        formatter = pd_logging.SafeFormatter(pd_logging._FORMAT)
+        record = logging.LogRecord(
+            name="test",
+            level=logging.INFO,
+            pathname=__file__,
+            lineno=1,
+            msg="hello",
+            args=(),
+            exc_info=None,
+        )
+        record.correlation_id = "conv-999"
+        output = formatter.format(record)
+        assert "conv-999" in output

@@ -100,12 +100,22 @@ class ResearcherAgent(BaseAgent):
             return None
 
     def _summarize(self, url: str, content: str) -> str | None:
-        """Extract the key claim from fetched content (first meaningful text)."""
+        """Extract the key claim from fetched content (first meaningful text).
+
+        Strips HTML tags so raw pages don't pollute findings with
+        doctype/script noise. In production this would be an LLM
+        summarization pass over the cleaned text.
+        """
+        import re
+
         text = content.strip()
         if not text:
             return None
-        # Simple extraction: take the first ~200 chars as the claim.
-        # In production this would be an LLM summarization pass.
+        # Strip HTML tags + collapse whitespace (the HTTP fallback returns raw HTML).
+        text = re.sub(r"<[^>]+>", " ", text)
+        text = re.sub(r"\s+", " ", text).strip()
+        if not text:
+            return None
         return text[:200]
 
 

@@ -26,27 +26,60 @@ def is_enabled() -> bool:
     return get_config().docling_enabled
 
 
+# In-memory parse cache keyed by (path, mtime) so the router and the
+# extractor reuse one Docling run per file instead of parsing twice.
+_PARSE_CACHE: dict[tuple[str, float], dict[str, Any]] = {}
+_MAX_CACHE_ENTRIES = 8
+
+
 def parse_document(input_path: Path) -> dict[str, Any] | None:
     """Parse a PDF with Docling. Per-parse lifecycle (no singleton).
 
     Returns {markdown, tables_json, page_images, page_count,
-    pages_with_tables} or None when disabled/failed.
+    pages_with_tables} or None when disabled/failed. Results are cached
+    per (path, mtime) so repeated calls in one process don't re-run the
+    heavy model.
     """
     if not is_enabled():
         return None
     try:
+        key = _cache_key(input_path)
+        if key in _PARSE_CACHE:
+            return _PARSE_CACHE[key]
+
+        # Disable torch inductor (needs MSVC cl.exe on Windows CPU).
+        import os
+
+        os.environ.setdefault("TORCHDYNAMO_DISABLE", "1")
+        os.environ.setdefault("TORCHINDUCTOR_DISABLE", "1")
+
         from docling.document_converter import DocumentConverter
 
-        converter = DocumentConverter(pipeline_options=_pipeline_options())
+        converter = DocumentConverter()
         try:
             result = converter.convert(str(input_path))
-            return _to_result(result, input_path)
+            parsed = _to_result(result, input_path)
         finally:
             del converter
             _free_gpu()
+
+        if parsed is not None:
+            _PARSE_CACHE[key] = parsed
+            if len(_PARSE_CACHE) > _MAX_CACHE_ENTRIES:
+                _PARSE_CACHE.pop(next(iter(_PARSE_CACHE)))
+        return parsed
     except Exception as e:
         logger.warning("Docling parse failed for %s: %s", input_path, e)
         return None
+
+
+def _cache_key(input_path: Path) -> tuple[str, float]:
+    """Cache key = (absolute path, mtime)."""
+    try:
+        mtime = input_path.stat().st_mtime
+    except OSError:
+        mtime = 0.0
+    return (str(input_path.resolve()), mtime)
 
 
 def _to_result(result, input_path: Path) -> dict[str, Any]:

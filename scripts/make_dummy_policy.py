@@ -16,21 +16,6 @@ def _escape(text: str) -> str:
     return text.replace("\\", r"\\").replace("(", r"\(").replace(")", r"\)")
 
 
-def _page(content_lines: list[str], page_number: int) -> bytes:
-    """Build one PDF page object with simple text content."""
-    lines = ["BT /F1 12 Tf 50 750 Td 14 TL"]
-    for line in content_lines:
-        lines.append(f"({_escape(line)}) Tj T*")
-    lines.append("ET")
-    stream = "\n".join(lines)
-    length = len(stream.encode("latin-1"))
-
-    return (
-        f"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] "
-        f"/Contents {page_number + 4} 0 R >>\n"
-    ).encode("latin-1")
-
-
 def build_pdf() -> bytes:
     """Assemble a minimal 3-page PDF."""
     pages = [
@@ -58,13 +43,11 @@ def build_pdf() -> bytes:
 
     # Object 1: catalog, 2: pages, 3: font, 4-6: page contents
     catalog = b"<< /Type /Catalog /Pages 2 0 R >>\n"
-    pages_obj = (
-        b"<< /Type /Pages /Kids [4 0 R 5 0 R 6 0 R] /Count 3 >>\n"
-    )
+    pages_obj = b"<< /Type /Pages /Kids [4 0 R 5 0 R 6 0 R] /Count 3 >>\n"
     font = b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\n"
 
     content_streams = []
-    for i, content in enumerate(pages):
+    for _i, content in enumerate(pages):
         lines = ["BT /F1 12 Tf 50 750 Td 14 TL"]
         for line in content:
             lines.append(f"({_escape(line)}) Tj T*")
@@ -93,8 +76,7 @@ def build_pdf() -> bytes:
         body += f"{off:010d} 00000 n \n".encode("latin-1")
 
     body += (
-        f"trailer\n<< /Size {len(objects) + 1} /Root 1 0 R >>\n"
-        f"startxref\n{xref_pos}\n%%EOF\n"
+        f"trailer\n<< /Size {len(objects) + 1} /Root 1 0 R >>\nstartxref\n{xref_pos}\n%%EOF\n"
     ).encode("latin-1")
     return body
 
