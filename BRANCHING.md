@@ -86,8 +86,36 @@ Pre-commit hooks are **local and advisory**:
   there won't find the hook files in that tree. The detached-HEAD hook only
   protects you when your *working tree* has it (i.e. you checked out a branch
   that contains it).
-- The hard enforcement for a shared repo is **CI + remote branch rules**
-  (protected `master`, required PRs, force-push disabled on the remote).
+
+### Server-side enforcement (the actual system check)
+
+The local hooks are the first line; the **CI workflow
+(`.github/workflows/ci.yml` → `git-guardrails` job)** is the enforcement that
+cannot be bypassed locally. On every push to `master` and every PR it checks:
+
+| Check | Fails when |
+|---|---|
+| Direct push to `master` | Someone pushes straight to `master` instead of a PR |
+| Changelog updated | A `src/` change (non-doc) lands without a `CHANGELOG.md` entry |
+| Tag immutability | `v0.1.0` (or any release tag) is moved/rewritten |
+
+It runs the same rules the local hooks enforce, but on the server — so
+`--no-verify` doesn't matter. A violating PR is red and cannot merge.
+
+### The hard layer: remote branch rules
+
+For a shared repo, the *hardest* enforcement is configured on the git host
+(GitHub "branch protection", GitLab "protected branches", etc.) and cannot be
+overridden by anyone without admin rights:
+
+- **Protect `master`**: no direct pushes, only PRs with required review + CI.
+- **Disable force-push** on `master` (the rewrite that could orphan history).
+- **Require status checks** — the `git-guardrails` job must be green.
+- **Protect the `v0.1.0` tag** — GitHub "Rulesets" can make a tag read-only so
+  it can't be deleted or moved, even by maintainers.
+
+The three layers — local hooks (advice), CI (enforcement), branch rules
+(hard protection) — are the standard defense-in-depth for this policy.
 
 Install with:
 
