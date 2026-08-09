@@ -194,3 +194,30 @@ def _free_gpu() -> None:
         torch.cuda.empty_cache()
     except Exception as e:
         logger.warning("Failed to free GPU cache: %s", e)
+
+
+def render_page(input_path: Path, page_number: int, out_dir: Path) -> Path | None:
+    """Render a PDF page to a PNG for vision fallback.
+
+    Uses pypdfium2 (bundled with docling). Returns the image path, or
+    None on failure. Page numbers are 1-based.
+    """
+    try:
+        import pypdfium2 as pdfium
+
+        out_dir.mkdir(parents=True, exist_ok=True)
+        pdf = pdfium.PdfDocument(str(input_path))
+        try:
+            if page_number < 1 or page_number > len(pdf):
+                return None
+            page = pdf[page_number - 1]
+            bitmap = page.render(scale=2.0)  # 2x for readability
+            pil_image = bitmap.to_pil()
+            out_path = out_dir / f"{input_path.stem}_page{page_number}.png"
+            pil_image.save(out_path, format="PNG")
+            return out_path
+        finally:
+            pdf.close()
+    except Exception as e:
+        logger.warning("Failed to render page %s of %s: %s", page_number, input_path, e)
+        return None

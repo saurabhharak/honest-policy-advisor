@@ -11,6 +11,60 @@ from policydecoder.agents.researcher_agent import ResearcherAgent
 from policydecoder.supervisor import Supervisor
 
 
+class TestLifeCalc:
+    def test_full_life_calc(self):
+        """Life calc computes XIRR + term+SIP + surrender from the data."""
+        data = {
+            "policy_name": "LIC Jeevan Anand",
+            "annual_premium": 50000,
+            "premium_term_years": 15,
+            "policy_term_years": 15,
+            "sum_assured": 1000000,
+            "maturity_value_at_8pct": 1120000,
+            "policy_start_date": "2022-01-01",
+            "free_look_period_days": 15,
+        }
+        calc = Supervisor._life_calc(data, user_age=30)
+        assert calc["xirr"] > 0
+        assert calc["term_sip_value"] > calc["policy_maturity"]  # SIP beats policy
+        assert calc["premiums_paid"] > 0
+        assert calc["surrender_loss"] >= 0
+
+    def test_incomplete_life_data_returns_zeros(self):
+        """Missing premium/term/maturity → safe zeros, no crash."""
+        calc = Supervisor._life_calc({"policy_name": "X"}, user_age=30)
+        assert calc["xirr"] == 0.0
+        assert calc["free_look_days"] == 15
+
+
+class TestDraftLetter:
+    @pytest.mark.asyncio
+    async def test_draft_letter_with_drafter(self):
+        """Supervisor delegates letter drafting to the LetterDrafter."""
+        supervisor = _make_supervisor(router_label="HEALTH")
+        mock_drafter = MagicMock()
+        mock_drafter.run = _fake_letter
+        supervisor.letter_drafter = mock_drafter
+
+        letter = await supervisor.draft_letter(
+            letter_type="complaint",
+            policy_data={"policy_name": "X", "insurer": "LIC"},
+            analysis={"summary": "bad"},
+        )
+        assert "complaint" in letter
+
+    @pytest.mark.asyncio
+    async def test_draft_letter_no_drafter_returns_empty(self):
+        supervisor = _make_supervisor(router_label="HEALTH")
+        supervisor.letter_drafter = None
+        letter = await supervisor.draft_letter("complaint", {}, {})
+        assert letter == ""
+
+
+async def _fake_letter(letter_type, policy_data, analysis, **kw):
+    return f"drafted {letter_type} letter"
+
+
 class TestSupervisorFanOut:
     @pytest.mark.asyncio
     async def test_health_media_runs_full_pipeline(self):
@@ -74,7 +128,7 @@ def _make_supervisor(router_label="HEALTH"):
     llm = MagicMock()
 
     class FakeRouter:
-        async def run(self, media_urls):
+        async def run(self, media_urls, input_path=None):
             return (router_label, 0.95)
 
     extractor = MagicMock()

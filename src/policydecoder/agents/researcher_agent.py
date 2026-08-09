@@ -100,11 +100,11 @@ class ResearcherAgent(BaseAgent):
             return None
 
     def _summarize(self, url: str, content: str) -> str | None:
-        """Extract the key claim from fetched content (first meaningful text).
+        """Extract the key claim from fetched content via a short LLM summary.
 
-        Strips HTML tags so raw pages don't pollute findings with
-        doctype/script noise. In production this would be an LLM
-        summarization pass over the cleaned text.
+        Strips HTML tags, then asks the LLM for a 1-2 sentence factual
+        summary so findings carry clean, attributable claims instead of
+        raw page text.
         """
         import re
 
@@ -116,7 +116,17 @@ class ResearcherAgent(BaseAgent):
         text = re.sub(r"\s+", " ", text).strip()
         if not text:
             return None
-        return text[:200]
+
+        prompt = (
+            "Summarize the following web page content into 1-2 factual sentences "
+            "about insurance. Return ONLY the summary text, no preamble.\n\n"
+            f"PAGE CONTENT (first 3000 chars):\n{text[:3000]}"
+        )
+        summary = self.generate("You are a research summarizer.", prompt, timeout=15)
+        summary = summary.strip()
+        if not summary:
+            return text[:200]  # LLM failed — fall back to naive truncation
+        return summary[:400]
 
 
 async def _default_fetch(url: str):

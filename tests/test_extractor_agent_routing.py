@@ -149,10 +149,14 @@ class TestPdfRouting:
                 "policydecoder.agents.extractor_agent.parse_document",
                 return_value=_fake_parse_result(),
             ),
+            patch(
+                "policydecoder.docling_parser.render_page",
+                return_value=Path("page1.png"),
+            ),
             patch.object(
                 agent.extractor,
-                "extract_health",
-                return_value={"sum_insured": 1500000},
+                "extract_from_image_path",
+                return_value={"sum_insured": 1500000, "annual_premium": 18000},
             ) as mock_vision,
         ):
             result = await agent.run(

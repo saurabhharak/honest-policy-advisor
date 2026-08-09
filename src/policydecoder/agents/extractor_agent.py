@@ -135,10 +135,28 @@ class ExtractorAgent(BaseAgent):
     def _vision_fallback(
         self, input_path: str, document_type: str, missing_fields: list[str]
     ) -> dict[str, Any]:
-        """Vision fallback: read a single page image for the missing fields."""
-        # For a local PDF we fall back to the vision extractor with no URL —
-        # in production the handler renders the specific page to an image.
-        return self._extract_vision([], document_type)
+        """Vision fallback: render a PDF page to an image and read it.
+
+        The Docling + text/table LLM missed some fields; triage confirmed
+        they exist in a page image. Render the relevant page(s) and run
+        the vision model on the image.
+        """
+        from policydecoder.docling_parser import render_page
+
+        out_dir = Path(input_path).parent / ".rendered_pages"
+        data: dict[str, Any] = {}
+        # Check a few key pages (1, 2, 3) for the missing fields.
+        for page_no in (1, 2, 3):
+            image_path = render_page(Path(input_path), page_no, out_dir)
+            if image_path is None:
+                continue
+            result = self.extractor.extract_from_image_path(str(image_path))
+            for key, value in result.items():
+                if value is not None and not data.get(key):
+                    data[key] = value
+            if not self._missing(data, document_type):
+                break
+        return data
 
     def _missing(self, data: dict[str, Any], document_type: str) -> list[str]:
         required = _REQUIRED.get(document_type, _REQUIRED["LIFE"])

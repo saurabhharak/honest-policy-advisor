@@ -26,8 +26,12 @@ class TestWhitelist:
 
 
 class TestResearcher:
-    def _agent(self, fetch_result=None, fetch_raises=None):
+    def _agent(self, fetch_result=None, fetch_raises=None, summary_text=None):
         llm = MagicMock()
+        if summary_text is not None:
+            resp = MagicMock()
+            resp.choices[0].message.content = summary_text
+            llm.chat.completions.create.return_value = resp
         if fetch_result is not None:
             resp = MagicMock()
             resp.text = fetch_result
@@ -42,13 +46,27 @@ class TestResearcher:
 
     @pytest.mark.asyncio
     async def test_picks_url_and_returns_findings(self):
-        agent = self._agent(fetch_result="Care Health has a 93% claim settlement ratio per IRDAI.")
+        agent = self._agent(
+            fetch_result="Care Health has a 93% claim settlement ratio per IRDAI.",
+            summary_text="Care Health reports a 93% claim settlement ratio.",
+        )
         findings = await agent.run(topic="care_health_csr")
         assert isinstance(findings, list)
         assert len(findings) >= 1
         assert "claim" in findings[0]
+        assert "93%" in findings[0]["claim"]  # LLM summary, not raw HTML
         assert "source" in findings[0]
         assert "url" in findings[0]
+
+    @pytest.mark.asyncio
+    async def test_uses_llm_summary_not_raw_text(self):
+        """The finding claim is the LLM summary, not the raw fetched page."""
+        agent = self._agent(
+            fetch_result="<html><body>raw page content</body></html>",
+            summary_text="This is the clean LLM summary of the page.",
+        )
+        findings = await agent.run(topic="care_health_csr")
+        assert findings[0]["claim"] == "This is the clean LLM summary of the page."
 
     @pytest.mark.asyncio
     async def test_whitelist_enforcement(self):

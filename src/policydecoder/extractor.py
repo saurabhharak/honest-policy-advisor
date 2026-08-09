@@ -134,6 +134,26 @@ class PolicyExtractor:
             self.logger.warning("Vision extraction failed for %s: %s", media_url[:60], e)
         return {}
 
+    def extract_from_image_path(self, image_path: str) -> dict[str, Any]:
+        """Extract policy details from a local image file (vision fallback).
+
+        Reads the image, base64-encodes it, and sends it as a data URL —
+        the vision model reads the rendered PDF page for missing fields.
+        """
+        import base64
+        import mimetypes
+
+        assert self.llm is not None, "extract_from_image_path requires an LLM client"
+        try:
+            mime = mimetypes.guess_type(image_path)[0] or "image/png"
+            with open(image_path, "rb") as f:
+                b64 = base64.b64encode(f.read()).decode("ascii")
+            data_url = f"data:{mime};base64,{b64}"
+            return self.extract_from_image(data_url)
+        except Exception as e:
+            self.logger.warning("Vision extraction from path failed for %s: %s", image_path, e)
+            return {}
+
     def extract_from_images(self, media_urls: list[str]) -> dict[str, Any]:
         """Extract from multiple pages and merge results.
 
