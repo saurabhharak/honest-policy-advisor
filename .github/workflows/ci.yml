@@ -70,7 +70,7 @@ jobs:
           python-version: "3.12"
       - name: Run bandit
         run: |
-          pip install bandit
+          pip install bandit bandit-sarif-formatter
           bandit -r src -x tests -f sarif -o bandit.sarif
       - name: Upload bandit results
         uses: github/codeql-action/upload-sarif@v3

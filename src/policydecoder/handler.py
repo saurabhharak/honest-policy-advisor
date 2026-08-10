@@ -127,7 +127,9 @@ def _handle_media_supervisor(message, supervisor, media):
                             f.write(resp.content)
                         input_path = tmp
                         media_urls.append(f"file://{tmp}")
-                        logger.info("Downloaded Telegram file → %s (%s bytes)", tmp, len(resp.content))
+                        logger.info(
+                            "Downloaded Telegram file → %s (%s bytes)", tmp, len(resp.content)
+                        )
                         continue
                 except Exception as e:
                     logger.warning("Failed to download media URL %s: %s", url[:60], e)

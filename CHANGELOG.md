@@ -8,6 +8,16 @@ See [VERSIONING.md](VERSIONING.md) for the versioning policy.
 
 ## [Unreleased]
 
+### Fixed
+
+- CI tests now run without secrets: `tests/conftest.py` provides dummy env
+  vars and resets the config cache so the suite passes in clean CI runners.
+- CI bandit step emits real SARIF via the `bandit-sarif-formatter` plugin
+  (bandit 1.9.x dropped the built-in sarif formatter).
+- CI enforces the branching policy server-side (see BRANCHING.md): blocks
+  direct pushes to `master` and requires a `CHANGELOG.md` entry for `src/`
+  changes.
+
 ## [0.1.0] - 2026-08-09
 
 ### Added
