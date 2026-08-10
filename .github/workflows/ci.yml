@@ -71,8 +71,7 @@ jobs:
       - name: Run bandit
         run: |
           pip install bandit bandit-sarif-formatter
-          bandit -r src -x tests -f json -o bandit.json
-          bandit-sarif-formatter bandit.json bandit.sarif
+          bandit -r src -x tests -f sarif -o bandit.sarif
       - name: Upload bandit results
         uses: github/codeql-action/upload-sarif@v3
         with:

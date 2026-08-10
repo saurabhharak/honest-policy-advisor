@@ -9,6 +9,28 @@ from policydecoder.case_manager import case_manager
 
 
 @pytest.fixture(autouse=True)
+def test_env(monkeypatch):
+    """Provide the env vars Config requires so tests run without a .env.
+
+    CI has no secrets. Config._require() raises without these, and several
+    agents call get_config() at construction. Dummy values are fine — tests
+    never make real network calls (LLM/vision are mocked).
+    """
+    for key, value in {
+        "CASPIAN_API_KEY": "test-caspian-key",
+        "TELEGRAM_BOT_TOKEN": "test-telegram-token",
+        "OPENAI_API_KEY": "test-openai-key",
+        "OPENAI_BASE_URL": "https://api.openai.com/v1",
+    }.items():
+        monkeypatch.setenv(key, value)
+    # Reset the cached Config so it is rebuilt from the dummy env vars.
+    import policydecoder.config as config_module
+
+    config_module._config = None
+    yield
+
+
+@pytest.fixture(autouse=True)
 def reset_case_manager():
     """Reset the singleton case manager before each test."""
     case_manager._cases.clear()
