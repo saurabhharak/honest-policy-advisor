@@ -84,7 +84,7 @@ def configure_logging(level: int = logging.INFO) -> None:
         file_handler.setFormatter(fmt)
         root.addHandler(file_handler)
     except Exception:
-        pass  # file logging is best-effort
+        pass  # file logging is best-effort: never break startup if the log file is unwritable  # nosec B110
 
     root.setLevel(level)
     _configured = True
