@@ -196,7 +196,7 @@ class PolicyExtractor:
         try:
             return HealthPolicyExtraction.model_validate(raw).model_dump()
         except Exception as e:
-            print(f"[EXTRACTOR] Health schema validation failed: {e}")
+            self.logger.warning("Health schema validation failed: %s", e)
             return raw
 
     def extract_life(self, media_urls: list[str]) -> dict[str, Any]:
@@ -205,7 +205,7 @@ class PolicyExtractor:
         try:
             return LifePolicyExtraction.model_validate(raw).model_dump()
         except Exception as e:
-            print(f"[EXTRACTOR] Life schema validation failed: {e}")
+            self.logger.warning("Life schema validation failed: %s", e)
             return raw
 
     def _extract_pages(self, media_urls: list[str], prompt: str) -> dict[str, Any]:
