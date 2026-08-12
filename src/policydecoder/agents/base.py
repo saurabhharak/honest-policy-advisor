@@ -12,6 +12,7 @@ from typing import Any
 from openai import OpenAI
 
 from policydecoder.config import get_config
+from policydecoder.extractor import response_text
 from policydecoder.logging import get_logger
 from policydecoder.opik_tracing import trace_llm
 
@@ -37,7 +38,7 @@ class BaseAgent:
                 max_tokens=2000,
                 timeout=timeout,
             )
-            content = response.choices[0].message.content
+            content = response_text(response)
             result = content.strip() if content else ""
             trace_llm(
                 f"{type(self).__name__.lower()}_generate",

@@ -8,6 +8,7 @@ import pytest
 
 from policydecoder.agents.extractor_agent import ExtractorAgent
 from policydecoder.agents.researcher_agent import ResearcherAgent
+from policydecoder.calculator import life_calc
 from policydecoder.supervisor import Supervisor
 
 
@@ -24,7 +25,7 @@ class TestLifeCalc:
             "policy_start_date": "2022-01-01",
             "free_look_period_days": 15,
         }
-        calc = Supervisor._life_calc(data, user_age=30)
+        calc = life_calc(data, user_age=30)
         assert calc["xirr"] > 0
         assert calc["term_sip_value"] > calc["policy_maturity"]  # SIP beats policy
         assert calc["premiums_paid"] > 0
@@ -32,7 +33,7 @@ class TestLifeCalc:
 
     def test_incomplete_life_data_returns_zeros(self):
         """Missing premium/term/maturity → safe zeros, no crash."""
-        calc = Supervisor._life_calc({"policy_name": "X"}, user_age=30)
+        calc = life_calc({"policy_name": "X"}, user_age=30)
         assert calc["xirr"] == 0.0
         assert calc["free_look_days"] == 15
 

@@ -29,35 +29,56 @@ GOOD: calculator.xirr(cash_flows) → 0.038 → passed to LLM for the report
 | Module | Its one job | What it does NOT do |
 |---|---|---|
 | `handler.py` | Route messages; materialize attachments | Analyze, calculate, draft letters |
-| `supervisor.py` | Orchestrate agents; fan out parallel work | Do math, generate content |
+| `supervisor.py` | Legacy orchestrator (flag-off fallback) | Do math, generate content |
+| `graph/pipeline.py` | Build the compiled LangGraph (nodes, edges, memory chain) | Do math, generate content |
+| `graph/nodes.py` | Graph node functions (route, extract, analyst, text flow) | Do math, draft letters |
+| `graph/memory.py` | L0-L3 layered memory over MemoryStore | Generate content, send messages |
+| `graph/identity.py` | UserStore: stable user_id across email + Telegram | Anything else |
+| `graph/backends.py` | Postgres pool + checkpointer/store setup + teardown | Business logic |
 | `agents/extractor_agent.py` | Parse + extract fields; short-circuit on missing data | Analyze, draft letters |
 | `agents/researcher_agent.py` | Fetch whitelisted sources; summarize | Compute policy numbers |
 | `agents/health_analyst.py` / `life_analyst.py` | Write honest verdict from computed data | Do math |
 | `agents/letter_drafter.py` | Draft letters | Analyze |
 | `docling_parser.py` | PDF → markdown/tables (per-parse lifecycle) | Anything else |
-| `calculator.py` / `health_calculator.py` | Pure financial math | LLM calls, state |
-| `case_manager.py` | State machine | Send messages, call LLM |
-| `store.py` | SQLite persistence | Business logic |
+| `calculator.py` / `health_calculator.py` | Pure financial math (incl. shared `life_calc`) | LLM calls, state |
+| `case_manager.py` / `store.py` | Legacy SQLite state machine (flag-off fallback) | Send messages, call LLM |
 | `guardrails.py` | Input/output safety rails | Anything else |
 | `opik_tracing.py` / `logging.py` | Observability | Business logic |
-| `prompts.py` | Prompt templates | Any logic at all |
+| `prompts.py` | Prompt templates (incl. memory extraction/merge) | Any logic at all |
 | `config.py` | Environment variables | Anything else |
 
-## Multi-agent orchestration
+## Multi-agent orchestration (LangGraph)
 
-The supervisor is the orchestrator. It:
+When `LANGGRAPH_ENABLED=true`, orchestration is a compiled LangGraph (`graph/pipeline.py`) on a **persistent event loop**:
 
-1. **Classifies** the document (Router → HEALTH/LIFE/TERM).
-2. **Fans out independent agents in parallel** (`asyncio.gather`) — e.g. Extractor + Researcher run concurrently, cutting end-to-end latency.
-3. **Runs dependent agents sequentially** — the analyst waits for both, the drafter waits for the verdict.
-4. **Sets correlation ID + starts the Opik trace** per message, so every agent's spans nest under one trace.
+1. **Route** — `route_start` branches: media → `media_route` (Router classify → HEALTH/LIFE), text → `text_intent` (intent classifier with memory context).
+2. **Fan out in parallel** — `extract` ∥ `research` run concurrently (LangGraph edges), then converge on a `gate` node.
+3. **Short-circuit** — if extraction short-circuits, `format_short_circuit` replies "I need the full policy document" without running the analyst.
+4. **Analyst** — HEALTH → `HealthAnalyst`; LIFE → deterministic `life_calc` + `LifeAnalyst` (math stays in `calculator.py`).
+5. **Memory chain (ordered)** — `memory_load → write_l0 → extract_l1 → (conditional) merge_l3 → update_l2`. `merge_l3` runs only when `extract_l1` produced ≥1 new atom.
+
+Backends are **async** (`AsyncPostgresSaver` / `AsyncPostgresStore`) on one shared `AsyncConnectionPool`. Sync savers would block the event loop inside `graph.ainvoke`. The vector extension is created **before** `store.setup()`; both `setup()` calls are awaited (idempotent schema migrations).
+
+The SDK callback is sync, so `handler.py` submits work via `asyncio.run_coroutine_threadsafe` to the persistent loop — never a per-message `asyncio.run` once the pool exists.
+
+The legacy `Supervisor` remains as the flag-off fallback (`supervisor.py`).
 
 ```python
-# Fan out independent work — never run these serially
-extract_task = self.extractor.run(...)
-research_task = self.researcher.run(...)
-extraction, findings = await asyncio.gather(extract_task, research_task)
+# Fan out independent work — LangGraph runs parallel edges for us
+builder.add_edge("media_route", "extract")
+builder.add_edge("media_route", "research")
+builder.add_edge("extract", "gate")     # fan-in barrier
+builder.add_edge("research", "gate")
 ```
+
+## Rubric-driven page triage (opt-in)
+
+When `use_rubric_triage=true` (set by the live handler for multi-page docs), the media path uses a **dual-track, page-by-page triage** (`graph/triage.py`) instead of the legacy head/middle/tail extraction:
+
+- **Track A (text)** — every page is LLM-checked against the product's rubric in parallel; each returns a Pydantic-validated `PageTriageOutput` (partial fields + findings).
+- **Track B (tables)** — ONE global `table_analyzer` call over the WHOLE Docling tables JSON. Cross-page tables (surrender schedules, premium projections) that Docling/TableFormer stitches structurally are never hallucinated by a page-local model.
+- **Rubrics** are gold-standard checklists (`data/rubrics/{health,life,term}.json`) stored in the PostgresStore (namespaced, versioned) and seeded at startup. `prepare_triage` loads a rubric ONCE into graph state — the parallel nodes read state, zero repeat DB queries.
+- **Deterministic calc** runs on the merged fields (exact-key contract, "LLM never does math"); **layman_writer** (second LLM, forbidden from recomputing) produces the plain-language verdict with per-item explanation + action from the rubric templates.
 
 ## Short-circuit extraction (no retry loops)
 
@@ -89,9 +110,16 @@ No branching on channel type. Ever.
 
 Silent failures kill demos. Loud, honest failures get fixed before the demo.
 
-## State
+## State & memory
 
-SQLite via `store.py`, managed by `case_manager.py`. The Caspian SDK provides **no agent-state API** — it's a channel/messaging SDK (`connect_*`, `on_message`, `reply`, `list_conversations`, `backfill`, `events`). Our own state layer is the correct choice; `list_messages`/`backfill` can rebuild conversation state on restart.
+**LangGraph mode** (`LANGGRAPH_ENABLED=true`): thread state persists via the Postgres checkpointer; long-term memory lives in the Postgres `MemoryStore`, namespaced per stable `user_id` (from the `users` table, shared across email + Telegram):
+
+- **L0 raw** `(user_id, "l0", thread_id)` — raw messages/events, no LLM, every turn.
+- **L1 atoms** `(user_id, "l1", "atoms")` — atomic facts, keyed by content hash, LLM-extracted only on meaningful events.
+- **L2 scenario** `(user_id, "l2", "scenarios")` — per-policy bundles, semantic-searchable.
+- **L3 persona** `(user_id, "l3", "profile")` — merged profile, only after L1 produced new atoms.
+
+**Legacy mode** (flag off): SQLite via `store.py`, managed by `case_manager.py`. The Caspian SDK provides **no agent-state API** — it's a channel/messaging SDK (`connect_*`, `on_message`, `reply`, `list_conversations`, `backfill`, `events`). Our own state layer is the correct choice; `list_messages`/`backfill` can rebuild conversation state on restart.
 
 ## Safety rails (guardrails)
 

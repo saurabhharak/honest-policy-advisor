@@ -55,11 +55,19 @@ def handle(
     extractor: PolicyExtractor,
     analyzer: PolicyAnalyzer,
     supervisor=None,
+    graph=None,
+    graph_runtime=None,
+    user_store=None,
+    agent_context=None,
 ):
     """Single handler for all channels.
 
     When a Supervisor is provided, media messages are routed through the
     multi-agent pipeline. Otherwise the legacy linear flow is used.
+
+    When graph + graph_runtime are provided (LangGraph mode), ALL messages
+    (media and text) flow through the compiled graph on the persistent
+    event loop.
     """
     conversation_id = message.conversation_id
     sender = (message.sender or {}).get("address", "anonymous")
@@ -70,12 +78,129 @@ def handle(
     set_correlation_id(conversation_id)
     set_trace_metadata(conversation_id, channel="unknown")
     try:
+        if graph is not None and graph_runtime is not None:
+            _handle_graph(
+                message, graph, graph_runtime, user_store, agent_context, sender, text, media
+            )
+            return
         if media and supervisor is not None:
             _handle_media_supervisor(message, supervisor, media)
             return
         _handle_inner(client, message, extractor, analyzer, conversation_id, sender, text, media)
     finally:
         flush()
+
+
+def _handle_graph(message, graph, graph_runtime, user_store, agent_context, sender, text, media):
+    """Route a message through the LangGraph pipeline on the persistent loop.
+
+    Materializes attachments (base64/Telegram URL → temp file) as the
+    supervisor path does, resolves the stable user_id, then submits the
+    graph invocation to the persistent event loop and blocks on the result.
+    """
+    import asyncio
+    import base64
+    import tempfile
+    from pathlib import Path
+
+    from policydecoder.graph.state import GraphContext
+
+    input_path = None
+    media_urls = []
+    for m in media:
+        url = m.get("url")
+        data = m.get("data")
+        if data:
+            suffix = Path(m.get("name") or "media.bin").suffix or ".pdf"
+            try:
+                raw = base64.b64decode(data)
+            except Exception:
+                raw = data.encode("utf-8")
+            fd, tmp = tempfile.mkstemp(suffix=suffix)
+            with open(fd, "wb") as f:
+                f.write(raw)
+            input_path = tmp
+            media_urls.append(f"file://{tmp}")
+        elif url:
+            name = m.get("name") or url.split("?")[0]
+            suffix = Path(name).suffix.lower()
+            is_telegram_file = "telegram.org" in url and "file" in url
+            if suffix == ".pdf" or is_telegram_file:
+                try:
+                    import requests
+
+                    fetch_url = url.replace("telegram.orgfile/", "telegram.org/file/")
+                    resp = requests.get(fetch_url, timeout=60)
+                    if resp.ok and resp.content:
+                        fd, tmp = tempfile.mkstemp(suffix=".pdf")
+                        with open(fd, "wb") as f:
+                            f.write(resp.content)
+                        input_path = tmp
+                        media_urls.append(f"file://{tmp}")
+                        logger.info(
+                            "Downloaded Telegram file → %s (%s bytes)", tmp, len(resp.content)
+                        )
+                        continue
+                except Exception as e:
+                    logger.warning("Failed to download media URL %s: %s", url[:60], e)
+            media_urls.append(url)
+
+    if not media_urls and not text:
+        message.reply("Send me a photo or PDF of your insurance policy and I'll analyze it.")
+        return
+
+    channel = getattr(message, "channel", None) or "unknown"
+    user_id = "anonymous"
+    if user_store is not None:
+        try:
+            user_id = asyncio.run_coroutine_threadsafe(
+                user_store.get_or_create(sender, channel), graph_runtime.loop
+            ).result(timeout=15)
+        except Exception as e:
+            logger.warning("UserStore lookup failed: %s", e)
+
+    input_state = {
+        "contact": sender,
+        "channel": channel,
+        "text": text,
+        "media_urls": media_urls,
+        "input_path": input_path,
+        "case_state": "IDLE",
+        "message_count": 0,
+        # Route media through the rubric page-by-page dual-track triage when
+        # we have a local file Docling can parse (PDF). Photos/URLs without a
+        # local file fall back to the legacy vision path via the route flag.
+        "use_rubric_triage": bool(input_path),
+    }
+    if input_path:
+        input_state["input_path"] = input_path
+
+    context = GraphContext(user_id=user_id, contact=sender, channel=channel, agents=agent_context)
+    config = {"configurable": {"thread_id": message.conversation_id}}
+
+    logger.info(
+        "GRAPH INVOKE: channel=%s media=%d input_path=%s use_rubric_triage=%s thread=%s",
+        channel,
+        len(media_urls),
+        bool(input_path),
+        bool(input_path),
+        message.conversation_id,
+    )
+    message.typing()
+    try:
+        result = asyncio.run_coroutine_threadsafe(
+            graph.ainvoke(input_state, config, context=context), graph_runtime.loop
+        ).result(timeout=180)
+    finally:
+        if input_path:
+            with contextlib.suppress(OSError):
+                Path(input_path).unlink(missing_ok=True)
+
+    reply = result.get("reply") if isinstance(result, dict) else None
+    if reply:
+        message.reply(reply)
+    else:
+        message.reply("I couldn't process that. Could you try again?")
 
 
 def _handle_media_supervisor(message, supervisor, media):

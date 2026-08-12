@@ -23,6 +23,26 @@ from policydecoder.prompts import (
 from policydecoder.schemas import HealthPolicyExtraction, LifePolicyExtraction
 
 
+def response_text(response) -> str:
+    """Read the assistant's text from an OpenAI-compatible response.
+
+    Some providers (e.g. Featherless reasoning models) return the answer in
+    `message.reasoning` with `content` empty; fall back so extraction never
+    silently yields nothing.
+    """
+    try:
+        message = response.choices[0].message
+    except (AttributeError, IndexError):
+        return ""
+    content = getattr(message, "content", None)
+    if content and content.strip():
+        return content.strip()
+    reasoning = getattr(message, "reasoning", None)
+    if reasoning and reasoning.strip():
+        return reasoning.strip()
+    return ""
+
+
 def parse_json_response(text: str) -> dict[str, Any]:
     """Extract the first JSON object from an LLM response, tolerating noise."""
     if not text or not text.strip():
@@ -120,7 +140,7 @@ class PolicyExtractor:
                 max_tokens=1500,
                 timeout=60,
             )
-            content = response.choices[0].message.content or ""
+            content = response_text(response)
             parsed = parse_json_response(content)
             if parsed:
                 trace_llm(
@@ -221,7 +241,7 @@ class PolicyExtractor:
                 max_tokens=1500,
                 timeout=60,
             )
-            content = response.choices[0].message.content or ""
+            content = response_text(response)
             parsed = parse_json_response(content)
             if parsed:
                 trace_llm(

@@ -1,0 +1,88 @@
+{
+  "product": "LIFE",
+  "version": 1,
+  "required_fields": ["policy_name", "annual_premium", "policy_term_years", "sum_assured"],
+  "source_notes": "IRDAI Regulations 2024 + Ditto ULIP charges guide + advisor policy-evaluation framework (XIRR, surrender ratio)",
+  "rules": [
+    {
+      "id": "xirr_below_benchmark",
+      "category": "returns",
+      "check": "XIRR of the benefit illustration vs term+SIP alternative (computed by calculator)",
+      "threshold": 5,
+      "severity": "alert",
+      "explain_template": "This policy's real return (XIRR) is below {threshold}% — a plain savings account or FD would beat it. The gap is the opportunity cost of staying invested.",
+      "action_template": "Compare against a term plan + SIP before deciding to keep paying premiums.",
+      "source": "Advisor policy-evaluation framework"
+    },
+    {
+      "id": "premium_allocation_charge",
+      "category": "charges",
+      "check": "premium allocation charge (ULIP, % of premium)",
+      "threshold": 5,
+      "severity": "warning",
+      "explain_template": "A premium allocation charge above {threshold}% means that share of every premium is deducted before it is invested — you pay it year after year.",
+      "action_template": "Ask for the year-by-year premium allocation schedule before renewing.",
+      "source": "Ditto ULIP charges guide"
+    },
+    {
+      "id": "fund_management_charge",
+      "category": "charges",
+      "check": "fund management charge (ULIP, % of fund value)",
+      "threshold": 2,
+      "severity": "warning",
+      "explain_template": "A fund management charge above {threshold}% compounds against your fund value year after year and quietly erodes returns.",
+      "action_template": "Compare fund management charges across insurers.",
+      "source": "Ditto ULIP charges guide"
+    },
+    {
+      "id": "surrender_loss",
+      "category": "returns",
+      "check": "surrender value vs premiums paid (computed by calculator)",
+      "threshold": null,
+      "severity": "alert",
+      "explain_template": "Surrendering now would lose a large share of the premiums you have paid.",
+      "action_template": "Get the current surrender value in writing before deciding to exit.",
+      "source": "Advisor policy-evaluation framework"
+    },
+    {
+      "id": "hidden_charges",
+      "category": "charges",
+      "check": "policy admin / mortality / surrender charges disclosed in the schedule",
+      "threshold": null,
+      "severity": "warning",
+      "explain_template": "Multiple stacked charges (admin, mortality, surrender) can consume more than {threshold}% of each premium.",
+      "action_template": "List every charge in the policy schedule and total what it costs per year.",
+      "source": "Ditto ULIP charges guide"
+    },
+    {
+      "id": "product_vs_need",
+      "category": "suitability",
+      "check": "product type vs the buyer's likely need (ULIP/endowment sold as investment)",
+      "threshold": null,
+      "severity": "alert",
+      "explain_template": "An investment-linked product (ULIP/endowment) sold as a pure 'investment' is a classic mis-selling pattern — the insurance cost quietly eats the returns.",
+      "action_template": "Check what you were told at sale vs what the policy actually is.",
+      "source": "IRDAI mis-selling regulations"
+    },
+    {
+      "id": "free_look",
+      "category": "consumer_right",
+      "check": "free-look period (days)",
+      "threshold": 30,
+      "severity": "info",
+      "explain_template": "You have a {threshold}-day free-look window from receiving the policy document to cancel and get a full refund.",
+      "action_template": "If the policy is recent, decide within the free-look window.",
+      "source": "IRDAI Regulations 2024"
+    },
+    {
+      "id": "premium_term_vs_policy_term",
+      "category": "suitability",
+      "check": "premium payment term vs policy term",
+      "threshold": null,
+      "severity": "info",
+      "explain_template": "The premium payment term (how long you pay) is shorter than the policy term (how long you are covered) — confirm this is what you expected.",
+      "action_template": "Note the difference between premium term and coverage term.",
+      "source": "Policy schedule review"
+    }
+  ]
+}

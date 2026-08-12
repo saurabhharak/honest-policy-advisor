@@ -94,12 +94,31 @@ def _to_result(result, input_path: Path) -> dict[str, Any]:
     if hasattr(doc, "export_to_markdown"):
         markdown = doc.export_to_markdown()
 
+    # Per-page markdown for the page-by-page triage track. Docling keys page
+    # items by page number; text items carry their provenance page.
+    pages_markdown: list[str] = []
+    page_count = len(getattr(doc, "pages", [])) or 1
+    try:
+        if page_count > 1 and hasattr(doc, "texts") and hasattr(doc, "pages"):
+            page_items: dict[int, list[str]] = {i: [] for i in range(1, page_count + 1)}
+            for text_item in doc.texts:
+                prov = getattr(text_item, "prov", None)
+                if not prov:
+                    continue
+                page_no = getattr(prov[0], "page_no", None) if prov else None
+                if page_no and page_no in page_items:
+                    label = getattr(text_item, "label", None)
+                    content = getattr(text_item, "text", "") or ""
+                    page_items[page_no].append(f"[{label}] {content}" if label else content)
+            pages_markdown = ["\n".join(page_items[i]) for i in range(1, page_count + 1)]
+    except Exception as e:
+        logger.warning("Per-page markdown extraction failed, falling back to full doc: %s", e)
+        pages_markdown = []
+
     # TableFormer tables surface in the markdown as pipe-table blocks in
     # this Docling version (doc.tables is empty). Parse them out so the
     # extractor agent can feed structured tables to the table-field LLM.
     tables_json = _extract_pipe_tables(markdown)
-
-    page_count = len(getattr(doc, "pages", [])) or 1
 
     trace_llm(
         "docling_parse",
@@ -111,6 +130,7 @@ def _to_result(result, input_path: Path) -> dict[str, Any]:
 
     return {
         "markdown": markdown,
+        "pages_markdown": pages_markdown,
         "tables_json": tables_json,
         "page_images": [],  # populated by the extractor agent if needed
         "page_count": page_count,

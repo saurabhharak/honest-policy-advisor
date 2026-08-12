@@ -119,12 +119,28 @@ class ExtractorAgent(BaseAgent):
         return data
 
     def _extract_text_fields(self, markdown: str) -> dict[str, Any]:
-        """Text-LLM extraction over markdown. The schedule + benefit
-        illustration often live in the first pages or the appendix, so we
-        scan the head AND tail (capped) rather than one contiguous window."""
+        """Text-LLM extraction over markdown.
+
+        The schedule + benefit illustration + premium tables often live in the
+        middle of these welcome-letter documents (e.g. Policybazaar letters put
+        the premium table ~17k chars in). Scan head + middle + tail windows
+        rather than one contiguous blob, so key fields are never omitted.
+        """
         head = markdown[:8000]
+        middle = ""
         tail = markdown[-8000:] if len(markdown) > 16000 else ""
-        combined = head + ("\n[...middle omitted...]\n" + tail if tail else "")
+
+        if len(markdown) > 24000:
+            mid_start = len(markdown) // 2 - 4000
+            middle = markdown[mid_start : mid_start + 8000]
+            combined = (
+                f"{head}\n[...middle 1 omitted...]\n{middle}\n[...middle 2 omitted...]\n{tail}"
+            )
+        elif len(markdown) > 16000:
+            combined = f"{head}\n[...middle omitted...]\n{tail}"
+        else:
+            combined = head
+
         prompt = DOCLING_TEXT_EXTRACTION_PROMPT.format(document_text=combined)
         content = self.generate("You are a policy text extractor.", prompt, timeout=20)
         parsed = parse_json_response(content)

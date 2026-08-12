@@ -36,6 +36,10 @@ class Config:
     opik_api_key: str
     docling_enabled: bool
     docling_text_model: str
+    langgraph_enabled: bool
+    database_url: str
+    postgres_pool_size: int
+    embeddings_model: str
 
 
 _config: Config | None = None
@@ -63,5 +67,16 @@ def get_config() -> Config:
             docling_enabled=os.getenv("DOCLING_ENABLED", "").strip().lower()
             in ("1", "true", "yes"),
             docling_text_model=_optional("DOCLING_TEXT_MODEL", llm_model),
+            langgraph_enabled=os.getenv("LANGGRAPH_ENABLED", "").strip().lower()
+            in ("1", "true", "yes"),
+            database_url=_optional("POSTGRES_DSN", ""),
+            postgres_pool_size=int(_optional("POSTGRES_POOL_SIZE", "5")),
+            embeddings_model=_optional("EMBEDDINGS_MODEL", "text-embedding-3-small"),
         )
     return _config
+
+
+def validate_langgraph_config(config: Config) -> None:
+    """Raise if LangGraph mode is enabled but its storage is misconfigured."""
+    if config.langgraph_enabled and not config.database_url:
+        raise ValueError("LANGGRAPH_ENABLED requires POSTGRES_DSN to be set")

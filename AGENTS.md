@@ -25,9 +25,20 @@ Channels: email (formal, PDF attachments, complaint letters) + Telegram (quick q
 ```
 policy-decoder/
 ├── src/policydecoder/           # the package
-│   ├── main.py                  # entry point, wires channels + supervisor
+│   ├── main.py                  # entry point, wires channels + supervisor/graph
 │   ├── handler.py               # one on_message handler
-│   ├── supervisor.py            # async orchestrator (parallel fan-out)
+│   ├── supervisor.py            # legacy async orchestrator (flag-off fallback)
+│   ├── graph/                   # LangGraph pipeline (LANGGRAPH_ENABLED)
+│   │   ├── pipeline.py          # build_graph: nodes, edges, memory chain
+│   │   ├── nodes.py             # route/extract/analyst/text node functions
+│   │   ├── memory.py            # L0-L3 layered memory over MemoryStore
+│   │   ├── identity.py          # UserStore: stable user_id (email + Telegram)
+│   │   ├── backends.py          # Postgres pool + checkpointer/store setup
+│   │   ├── triage.py            # dual-track page-by-page triage + layman writer
+│   │   ├── rubrics.py           # per-product gold-standard rubrics + prompt builders
+│   │   ├── prompt_store.py      # rubric/prompt storage in PostgresStore namespaces
+│   │   └── state.py             # PipelineState + GraphContext
+│   ├── embeddings.py            # OpenAI embeddings wrapper for semantic search
 │   ├── agents/                  # specialist agents
 │   │   ├── extractor_agent.py   # Docling + text/table extraction + short-circuit
 │   │   ├── researcher_agent.py  # whitelisted fetch + LLM summary
@@ -69,6 +80,9 @@ policy-decoder/
 - **Docling is per-parse, never a singleton** (GPU memory).
 - **Researcher cites only whitelisted domains** (fact-drift prevention).
 - **Guardrails/Opik/Docling are opt-in** via env vars; disabled = zero latency.
+- **LangGraph is opt-in** (`LANGGRAPH_ENABLED`); requires Postgres + pgvector (`POSTGRES_DSN`). Async backends on one persistent event loop; never a per-message `asyncio.run` once the pool exists.
+- **Memory is layered L0-L3** namespaced per stable `user_id`; `merge_l3` only runs after `extract_l1` produced new atoms.
+- **Rubrics are per-product gold-standard checklists** (`data/rubrics/`) stored in the store; `use_rubric_triage` routes media through the dual-track page triage (text pages ∥ global table analyzer). LLM notices/explains; calculators do all math.
 - **Quality gates:** `ruff check`, `ruff format --check`, `mypy`, `pytest` — all in CI.
 
 ## SDK reference
@@ -76,4 +90,4 @@ policy-decoder/
 Live integration guide: https://api.trycaspianai.com/SKILL.md
 SDK repo: https://github.com/TryCaspian/caspian-sdk
 
-Note: the SDK is channel/messaging only — it has **no agent-state API**. State lives in our `case_manager.py` + SQLite `store.py`.
+Note: the SDK is channel/messaging only — it has **no agent-state API**. State lives in our `case_manager.py` + SQLite `store.py` (legacy) or LangGraph checkpointer + MemoryStore (when `LANGGRAPH_ENABLED`).

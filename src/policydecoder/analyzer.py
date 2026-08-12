@@ -13,7 +13,7 @@ from typing import Any
 from openai import OpenAI
 
 from policydecoder.config import get_config
-from policydecoder.extractor import parse_json_response
+from policydecoder.extractor import parse_json_response, response_text
 from policydecoder.guardrails import validate_letter_output
 from policydecoder.logging import get_logger
 from policydecoder.opik_tracing import trace_llm
@@ -49,7 +49,7 @@ class PolicyAnalyzer:
                 max_tokens=2000,
                 timeout=timeout,
             )
-            content = response.choices[0].message.content
+            content = response_text(response)
             result = content.strip() if content else ""
             trace_llm(
                 "analyzer_generate",

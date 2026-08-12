@@ -323,3 +323,45 @@ Policy: {policy_name}
 Key finding: {key_finding}
 
 Write a brief, factual update. What's done, what's next, what the user needs to do."""
+
+
+MEMORY_EXTRACTION_PROMPT = """You are extracting durable facts about an insurance user from a conversation turn.
+
+Extract atomic facts that would be useful to remember across sessions. Include:
+- The user's age, family details, or dependents
+- Which policies they own (name, insurer, premium, term)
+- Their preferences or constraints (budget, risk stance, communication preference)
+- Key events (policy bought, complaint filed, letter sent, refund received)
+
+Skip transient chatter, greetings, and anything that won't be relevant later.
+
+== CONVERSATION TURN ==
+{conversation}
+
+Respond with ONLY a JSON object:
+{{
+    "facts": ["atomic fact 1", "atomic fact 2"]
+}}
+
+If there is nothing worth remembering, return "facts": []."""
+
+
+PROFILE_MERGE_PROMPT = """You maintain a long-term profile of an insurance user.
+
+Current profile:
+{old_profile}
+
+New facts learned this turn:
+{new_facts}
+
+Merge the new facts into the profile. Keep it concise and structured. If a new fact
+contradicts an old one, the new fact wins. Respond with ONLY a JSON object:
+{{
+    "profile": {{
+        "age": "number or null",
+        "family": "string or null",
+        "policies": ["string or null"],
+        "preferences": ["string or null"],
+        "events": ["string or null"]
+    }}
+}}"""

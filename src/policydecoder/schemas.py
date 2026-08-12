@@ -158,3 +158,54 @@ class LifePolicyExtraction(BaseModel):
         """Return list of missing required fields. Empty = usable."""
         required = ["policy_name", "annual_premium", "policy_term_years", "sum_assured"]
         return [f for f in required if not getattr(self, f)]
+
+
+class PageFinding(BaseModel):
+    """One concern flagged on a single page by the page-triage LLM."""
+
+    category: str  # rubric rule id, e.g. "co_pay"
+    severity: Literal["info", "warning", "alert"]
+    what: str  # the fact as it appears on the page
+    why_concerning: str  # plain-language why it matters
+    source_text: str  # short verbatim quote from the page
+    page: int | None = None  # None for table findings spanning a page range
+
+
+class PageTriageOutput(BaseModel):
+    """Strict JSON contract for one page of the page-by-page triage."""
+
+    page_number: int
+    fields: dict[str, Any] = {}  # PARTIAL extraction — only text fields visible on THIS page
+    findings: list[PageFinding] = []
+    page_summary: str = ""  # one line: what this page is
+
+
+class TableAnalysisOutput(BaseModel):
+    """Strict JSON contract for the global table-analyzer node (whole tables JSON).
+
+    Table-centric fields that need whole-table context (surrender schedules,
+    premium projections, sub-limit grids) — Docling/TableFormer stitches these
+    across page breaks structurally, so this node sees the FULL tables.
+    """
+
+    fields: dict[str, Any] = {}
+    findings: list[PageFinding] = []
+    table_summary: str = ""
+
+
+class LaymanItem(BaseModel):
+    """One plain-language explanation item for the user-facing verdict."""
+
+    severity: Literal["info", "warning", "alert"]
+    what: str  # "Co-pay of 30% on claims"
+    why_it_matters: str  # from rubric explain_template + actual values
+    what_to_do: str  # from rubric action_template
+    page: int | None = None
+
+
+class LaymanVerdict(BaseModel):
+    """Final plain-language verdict produced by the layman-writer LLM."""
+
+    summary: str
+    items: list[LaymanItem] = []
+    verdict: Literal["GOOD", "REVIEW", "ALERT"]

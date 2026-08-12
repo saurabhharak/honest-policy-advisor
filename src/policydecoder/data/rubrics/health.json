@@ -1,0 +1,118 @@
+{
+  "product": "HEALTH",
+  "version": 1,
+  "required_fields": ["sum_insured", "annual_premium"],
+  "source_notes": "Ditto health checklist + IRDAI Protection of Policyholders Interests Regulations 2024 + IRDAI FY2024-25 insurer data",
+  "rules": [
+    {
+      "id": "co_pay",
+      "category": "cost_share",
+      "check": "co-pay percentage applied to claims",
+      "threshold": 20,
+      "severity": "warning",
+      "explain_template": "A co-pay above {threshold}% means you pay that share of EVERY claim out of pocket. A {threshold}% co-pay on a ₹5L claim is ₹1L from your pocket.",
+      "action_template": "Ask the insurer for a no-co-pay variant, or compare alternatives before renewing.",
+      "source": "Ditto health checklist"
+    },
+    {
+      "id": "room_rent_cap",
+      "category": "room_rent",
+      "check": "per-day room rent cap (₹/day)",
+      "threshold": 3000,
+      "severity": "warning",
+      "explain_template": "A room-rent cap under ₹{threshold}/day confines you to a shared ward; the room cost then eats a large share of your sum insured on a multi-day stay.",
+      "action_template": "Check whether a higher room-rent tier is worth the extra premium.",
+      "source": "Ditto health checklist"
+    },
+    {
+      "id": "disease_sub_limits",
+      "category": "sub_limits",
+      "check": "sub-limits on common procedures (ICU, c-section, cataract, dialysis)",
+      "threshold": null,
+      "severity": "alert",
+      "explain_template": "Sub-limits cap how much the insurer pays for common treatments like ICU stays, c-sections, cataract surgery, or dialysis — even if your sum insured is large.",
+      "action_template": "Read the sub-limit schedule carefully; these are the treatments families most often claim.",
+      "source": "Ditto health checklist"
+    },
+    {
+      "id": "pre_post_hospitalization",
+      "category": "hospitalization",
+      "check": "pre & post-hospitalization cover days",
+      "threshold": "30/90",
+      "severity": "warning",
+      "explain_template": "Pre & post-hospitalization cover pays for diagnostic tests before admission and medication after discharge. Below {threshold} days, you pay more of these costs yourself.",
+      "action_template": "Prefer a policy covering at least 30 days pre and 90 days post hospitalization.",
+      "source": "Ditto health checklist"
+    },
+    {
+      "id": "ped_waiting_period",
+      "category": "waiting_period",
+      "check": "pre-existing disease waiting period (years)",
+      "threshold": 4,
+      "severity": "warning",
+      "explain_template": "A pre-existing disease waiting period above {threshold} years means diabetes, BP, or thyroid claims are not covered until that time has passed.",
+      "action_template": "Confirm exactly when your pre-existing conditions become coverable.",
+      "source": "Ditto health checklist"
+    },
+    {
+      "id": "accident_waiting_period",
+      "category": "waiting_period",
+      "check": "accident waiting period (days)",
+      "threshold": 30,
+      "severity": "info",
+      "explain_template": "An accident waiting period above {threshold} days delays coverage for accident-related claims.",
+      "action_template": "Prefer a policy with the shortest accident waiting period.",
+      "source": "Ditto health checklist"
+    },
+    {
+      "id": "daycare_coverage",
+      "category": "coverage",
+      "check": "daycare treatments covered (chemo, dialysis, appendectomy)",
+      "threshold": null,
+      "severity": "alert",
+      "explain_template": "Daycare treatments (chemotherapy, dialysis, appendectomy) don't require a 24-hour stay. If not covered, these common procedures are not payable.",
+      "action_template": "Verify daycare coverage for chemo, dialysis, and appendectomies specifically.",
+      "source": "Ditto health checklist"
+    },
+    {
+      "id": "restoration_benefit",
+      "category": "coverage",
+      "check": "sum insured restoration after a claim",
+      "threshold": null,
+      "severity": "warning",
+      "explain_template": "Without restoration, once your sum insured is used up by one claim, further claims in the same year are not covered.",
+      "action_template": "Prefer a policy that restores the sum insured at least once per year.",
+      "source": "Ditto health checklist"
+    },
+    {
+      "id": "network_hospitals",
+      "category": "network",
+      "check": "cashless network hospital count",
+      "threshold": 5000,
+      "severity": "warning",
+      "explain_template": "A cashless network under {threshold} hospitals makes it harder to find cashless treatment near you.",
+      "action_template": "Check the network covers hospitals in your city.",
+      "source": "Ditto health checklist"
+    },
+    {
+      "id": "insurer_icr",
+      "category": "insurer_health",
+      "check": "incurred claim ratio (ICR) — IRDAI FY24-25",
+      "threshold": "50-80",
+      "severity": "info",
+      "explain_template": "An ICR between 50% and 80% is healthy. Below 50% may signal strict claim approvals; above ~95% can strain the insurer's long-term stability.",
+      "action_template": "Compare the insurer's ICR trend over 3 years, not a single year.",
+      "source": "Ditto ICR guide / IRDAI annual reports"
+    },
+    {
+      "id": "free_look",
+      "category": "consumer_right",
+      "check": "free-look period (days)",
+      "threshold": 30,
+      "severity": "info",
+      "explain_template": "You have a {threshold}-day free-look window from receiving the policy document to cancel and get a full refund.",
+      "action_template": "If the policy is recent, decide within the free-look window.",
+      "source": "IRDAI Regulations 2024"
+    }
+  ]
+}
