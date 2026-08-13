@@ -8,8 +8,39 @@ See [VERSIONING.md](VERSIONING.md) for the versioning policy.
 
 ## [Unreleased]
 
+### Added
+
+- LangGraph pipeline (opt-in via `LANGGRAPH_ENABLED`): compiled graph with
+  route/extract/analyst/text nodes, parallel extract ∥ research fan-out,
+  and a text intent flow replacing the legacy CaseState machine.
+- Per-product gold-standard rubrics (`data/rubrics/`) with dual-track
+  page-by-page triage: parallel per-page rubric review + a global table
+  analyzer, targeted re-read for missing fields, and a layman-writer
+  verdict node.
+- L0-L3 layered memory over LangGraph's MemoryStore (raw → atoms →
+  scenarios → persona) with a stable `user_id` spanning email + Telegram;
+  Postgres + pgvector backends (`graph/backends.py`).
+- Opik evaluation harness (`evals/`): gold datasets + deterministic metrics
+  for all six agents, plus a robust LLM judge (`--live`) that tolerates
+  Featherless reasoning-mode output.
+- `scripts/seed_evals.py` (Docling cache + dataset seeding),
+  `scripts/live_test_graph.py`, `scripts/trigger_policy_flow.py`.
+
 ### Fixed
 
+- LLM responses on Featherless reasoning models returned content in
+  `message.reasoning` with `content` empty — every LLM call site now reads
+  via `response_text()` (content → reasoning fallback), fixing empty
+  extraction/analysis/letters.
+- `GraphRuntime.start()` discarded `_build_graph()`'s return value, so
+  `graph` stayed `None` and messages silently fell back to the legacy
+  supervisor; the built graph/user_store/agent_context/backends are now
+  captured (regression test in `tests/test_main_runtime.py`).
+- Family-floater premium extraction: `annual_premium` is now
+  table-authoritative in `accumulate`, so the whole-table premium (both
+  insured persons) overrides a page-local partial row.
+- Replaced leftover debug `print()` in the extractor with structured
+  logging.
 - CI tests now run without secrets: `tests/conftest.py` provides dummy env
   vars and resets the config cache so the suite passes in clean CI runners.
 - CI bandit step emits real SARIF via the `bandit-sarif-formatter` plugin

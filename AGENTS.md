@@ -8,7 +8,7 @@ Caspian AI Agent Hackathon (15-day, online). Agent must use caspian-sdk and run 
 
 ## What we're building
 
-The agent receives an insurance policy PDF via email attachment or Telegram photo. A **supervisor + specialist agents** pipeline processes it:
+The agent receives an insurance policy PDF via email attachment or Telegram photo. A **LangGraph pipeline with specialist agents** processes it (the legacy async supervisor remains as the flag-off fallback):
 
 - **Router Agent** — classifies the document (HEALTH/LIFE/TERM)
 - **Extractor Agent** — Docling parses the PDF (layout + tables + OCR), then text/table LLMs extract the fields; **short-circuits** when data is genuinely absent (e.g. user uploaded a receipt, not the full policy)
@@ -39,6 +39,13 @@ policy-decoder/
 │   │   ├── prompt_store.py      # rubric/prompt storage in PostgresStore namespaces
 │   │   └── state.py             # PipelineState + GraphContext
 │   ├── embeddings.py            # OpenAI embeddings wrapper for semantic search
+│   ├── evals/                   # Opik evaluation harness
+│   │   ├── config.py            # Opik client + judge model
+│   │   ├── datasets.py          # gold loading + clear/insert dataset seeding
+│   │   ├── tasks.py             # sync task wrappers (fresh asyncio loop per thread)
+│   │   ├── metrics.py           # deterministic metrics + RobustLLMJudge
+│   │   ├── run_all.py           # CLI: --agent X [--live] / --all
+│   │   └── data/                # gold JSON datasets + docling_cache/
 │   ├── agents/                  # specialist agents
 │   │   ├── extractor_agent.py   # Docling + text/table extraction + short-circuit
 │   │   ├── researcher_agent.py  # whitelisted fetch + LLM summary
@@ -63,7 +70,7 @@ policy-decoder/
 │   ├── config.py                # env config
 │   └── data/insurer_metrics.json  # IRDAI FY24-25 benchmark dataset
 ├── tests/
-├── scripts/                     # download/generate test policies, run_policy_file
+├── scripts/                     # download/generate test policies, run_policy_file, seed_evals
 ├── PLAN.md
 ├── ENGINEERING.md
 ├── HACKATHON.md
@@ -83,6 +90,7 @@ policy-decoder/
 - **LangGraph is opt-in** (`LANGGRAPH_ENABLED`); requires Postgres + pgvector (`POSTGRES_DSN`). Async backends on one persistent event loop; never a per-message `asyncio.run` once the pool exists.
 - **Memory is layered L0-L3** namespaced per stable `user_id`; `merge_l3` only runs after `extract_l1` produced new atoms.
 - **Rubrics are per-product gold-standard checklists** (`data/rubrics/`) stored in the store; `use_rubric_triage` routes media through the dual-track page triage (text pages ∥ global table analyzer). LLM notices/explains; calculators do all math.
+- **Evals are deterministic-first** (`evals/`): deterministic metrics (router label, extractor field accuracy, whitelist, letter phrases, verdict equality) always run and gate CI; the LLM judge (`RobustLLMJudge`) is `--live`-only and advisory. The judge reuses `parse_json_response` — Featherless reasoning models truncate JSON, so never assume a clean `response_format`. Gold JSON files are the source of truth; seeding does clear+insert so the Opik dataset never drifts.
 - **Quality gates:** `ruff check`, `ruff format --check`, `mypy`, `pytest` — all in CI.
 
 ## SDK reference

@@ -186,7 +186,8 @@ Pre-commit hooks enforce the same locally.
 message.reply(text)                                  # SDK routes to correct channel
 case = case_manager.get(conversation_id)             # state via manager
 result = calculator.xirr(cash_flows)                 # Python for math
-analysis = await supervisor.process_media(urls, input_path=...)  # orchestrator
+analysis = await supervisor.process_media(urls, input_path=...)  # legacy orchestrator
+result = await graph.ainvoke(input_state, config)    # LangGraph orchestrator (default)
 parsed = docling_parser.parse_document(path)          # PDF → markdown/tables
 
 # DON'T

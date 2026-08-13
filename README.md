@@ -17,7 +17,7 @@ The verdict is always honest — including "this policy is fine" when it is.
 
 ## Architecture
 
-A **supervisor + specialist agents** pipeline. The supervisor routes, fans out independent agents in parallel, and runs the dependent ones sequentially.
+A **LangGraph pipeline** (default, `LANGGRAPH_ENABLED=true`) with specialist agents. A single `on_message` handler routes both channels through the compiled graph; a legacy async supervisor remains as the flag-off fallback.
 
 ```
 User message (email / Telegram)
@@ -26,19 +26,24 @@ User message (email / Telegram)
 handler.py ── one on_message handler (channel-agnostic)
   │
   ▼
-Supervisor
+LangGraph pipeline (graph/pipeline.py)
   ├─ Router Agent        — classify document (HEALTH / LIFE / TERM)
   ├─ Extractor Agent     — Docling PDF parse → text/table LLM extraction → short-circuit on missing data
   ├─ Researcher Agent    — fetch live info (whitelisted domains: irdai.gov.in, joinditto.in, beshak.org)
+  ├─ Rubric triage       — dual-track page-by-page review (page triage ∥ global table analyzer)
   ├─ Health Analyst      — deterministic scoring + honest verdict (calls calculators)
   ├─ Life Analyst        — XIRR + term+SIP + surrender (calls calculators)
-  └─ Letter Drafter      — free-look / complaint / ombudsman letters
+  ├─ Letter Drafter      — free-look / complaint / ombudsman letters
+  └─ Memory chain        — L0-L3 layered memory (raw → atoms → scenarios → persona)
 Tools: calculators (pure math), insurer_data (IRDAI benchmark), email_link, fetch
 Safety: NeMo Guardrails on every input/output
 Observability: Opik tracing + structured logging with correlation IDs
+Evaluation: Opik eval harness (evals/) scores each agent against gold data
 ```
 
 **Key principle: the LLM never does math.** All financial computation lives in pure Python (`calculator.py`, `health_calculator.py`). The LLM only interprets computed numbers and writes prose.
+
+**Rubric triage** (for multi-page PDFs): every page is checked against the product's gold-standard rubric (per-product checklists in `data/rubrics/`, sourced from Ditto's checklists + IRDAI regulations), in parallel with a global table analyzer that sees the whole document's tables. Findings accumulate, then deterministic calculators run, then a second LLM writes the plain-language verdict — it never recomputes anything.
 
 ## Channels
 
@@ -89,6 +94,9 @@ cp .env.example .env
 | `GUARDRAILS_ENABLED` | no | false | NeMo rails |
 | `OPIK_ENABLED` / `OPIK_URL` / `OPIK_API_KEY` | no | false | Opik tracing |
 | `DOCLING_ENABLED` / `DOCLING_TEXT_MODEL` | no | false | Docling PDF parse |
+| `LANGGRAPH_ENABLED` / `POSTGRES_DSN` / `POSTGRES_POOL_SIZE` | no | false | LangGraph pipeline + memory (requires Postgres + pgvector) |
+| `EMBEDDINGS_MODEL` | no | text-embedding-3-small | memory semantic search |
+| `EVAL_JUDGE_MODEL` | no | LLM_MODEL | Opik eval harness judge |
 
 ### Run
 
@@ -113,6 +121,24 @@ uv run python scripts/run_policy_file.py <path-to-policy.pdf>
 ```
 
 Runs the full pipeline (router → Docling → extractor → analyst) on a local PDF and prints the verdict. This is the fastest way to verify the analysis path.
+
+### Evaluate the agents
+
+Each agent is scored against labeled gold data via an Opik eval harness:
+
+```bash
+# Seed the Docling cache + gold datasets (one-time; ~10 min for 8 PDFs)
+uv run python scripts/seed_evals.py
+
+# Deterministic metrics only (offline, no Opik/LLM judge)
+uv run python -m policydecoder.evals.run_all --all
+
+# Full Opik experiment with the LLM judge (--live)
+uv run python -m policydecoder.evals.run_all --agent letter_drafter --live
+uv run python -m policydecoder.evals.run_all --all --live
+```
+
+Deterministic metrics (router label accuracy, extractor field accuracy, researcher whitelist, letter phrase coverage, verdict equality) run always and are free; the LLM judge (`RobustLLMJudge`) runs only with `--live`. Results land in the Opik UI under the `policy-decoder` project.
 
 ### Generate test policies
 
@@ -164,9 +190,10 @@ The Researcher agent fetches live market/regulatory context on demand (e.g. Ditt
 - **No secrets in repo** — `.env` is gitignored; `.env.example` documents all variables.
 - **Source whitelist** — the researcher only cites vetted domains.
 
-## Observability
+## Observability & evaluation
 
 - **Opik tracing** (opt-in): every LLM call across all agents is traced with inputs, outputs, model, and a per-message correlation ID. Browse traces in the Opik UI.
+- **Opik evaluation** (`evals/`): each agent is scored against gold data with deterministic metrics + an optional LLM judge — see [Evaluate the agents](#evaluate-the-agents).
 - **Structured logging**: all logs carry the conversation's correlation ID, tying every record to its trace.
 
 ## Contributing

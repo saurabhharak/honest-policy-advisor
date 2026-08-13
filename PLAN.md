@@ -23,31 +23,39 @@ Nobody reads the 45-page policy document. That's the whole trick.
 
 **Telegram** (connect_telegram): user sends a photo of the policy or asks quick questions. Agent replies with the key numbers and next steps.
 
-## Architecture
+## Architecture (current)
 
 ```
 user sends policy PDF (email attachment or Telegram photo)
         │
         ▼
-  handler.py ── the one on_message handler, routes by intent
+  handler.py ── the one on_message handler (channel-agnostic)
         │
-        ├─▶ extractor.py ── vision model reads the PDF, outputs structured JSON
-        │                     (policy name, premium, term, sum assured,
-        │                      surrender value table, charges)
+        ▼
+  LangGraph pipeline (LANGGRAPH_ENABLED) ── legacy Supervisor is the flag-off fallback
         │
-        ├─▶ calculator.py ── pure Python. XIRR of the policy. Term+SIP
-        │                     comparison. Surrender value. Opportunity cost.
+        ├─▶ Router Agent ── Docling/heuristic classify → HEALTH / LIFE / TERM
+        │
+        ├─▶ Extractor Agent ── Docling (layout+tables+OCR) → text/table LLM
+        │                     extraction → short-circuit on genuinely missing data
+        │
+        ├─▶ Rubric triage (multi-page) ── dual track: per-page rubric review
+        │                     ∥ global table analyzer; findings accumulate
+        │
+        ├─▶ calculators ── pure Python. XIRR, term+SIP comparison, surrender
+        │                     value, opportunity cost, health scoring.
         │                     The LLM never does math.
         │
-        ├─▶ analyzer.py ── LLM receives the extracted JSON + calculator
-        │                    results. Decides: mis-sold or not? Which
-        │                    clauses are problems? What escalation path?
-        │                    Drafts the letter.
+        ├─▶ Analyst agents ── LLM writes the honest verdict from computed
+        │                     numbers + rubric findings (never recomputes)
         │
-        └─▶ case_manager.py ── tracks where each user is in the process
-                               (received PDF → analyzed → letter drafted →
-                                complaint filed → resolved)
+        ├─▶ Letter Drafter ── free-look / complaint / ombudsman letters
+        │
+        └─▶ Memory chain ── L0-L3 layered memory (raw → atoms → scenarios → persona)
+                              per stable user_id, in Postgres (pgvector)
 ```
+
+The old vision-only linear path (`extractor.py` → `analyzer.py` → `case_manager.py`) still exists for photos and as the non-LangGraph fallback.
 
 ## Case state machine
 
@@ -99,19 +107,19 @@ The analyzer then decides:
 
 ## Scope limits
 
-In scope:
-- ULIP and endowment policies (the two most mis-sold types)
+In scope (current):
+- ULIP and endowment policies (the two most mis-sold types) + term plans
+- **Health insurance** — full rubric-based review (room-rent caps, co-pay, waiting periods, sub-limits, restoration)
 - PDF upload via email or Telegram photo
 - Extract → calculate → analyze → draft → track
 - Free-look cancellation and Bima Bharosa complaint paths
+- Multi-page rubric triage + L0-L3 memory + Opik evaluation
 
 Not in scope:
-- Term insurance (nothing to decode)
-- Health insurance (different rules)
 - Claim rejection disputes (different problem)
 - Every insurer's surrender formula (we extract it from the PDF)
 
-## File structure
+## File structure (current)
 
 ```
 policy-decoder/
@@ -120,25 +128,22 @@ policy-decoder/
 ├── pyproject.toml
 ├── src/
 │   └── policydecoder/
-│       ├── __init__.py
-│       ├── main.py          # entry point, connects channels
-│       ├── handler.py       # the one on_message handler
-│       ├── extractor.py     # vision model PDF extraction
-│       ├── calculator.py    # pure Python financial math
-│       ├── analyzer.py      # LLM analysis + letter drafting
-│       ├── case_manager.py  # state machine + storage
-│       ├── store.py         # SQLite persistence
-│       ├── email_link.py    # Gmail compose links
-│       ├── prompts.py       # all prompt templates
-│       └── config.py        # env config
+│       ├── main.py            # entry point, wires channels + graph/supervisor
+│       ├── handler.py         # the one on_message handler
+│       ├── graph/             # LangGraph pipeline (nodes, triage, memory, identity, backends)
+│       ├── agents/            # specialist agents (extractor, researcher, analysts, drafter)
+│       ├── evals/             # Opik eval harness (datasets, tasks, metrics, run_all)
+│       ├── docling_parser.py  # PDF → markdown/tables (per-parse lifecycle)
+│       ├── extractor.py       # vision-model extraction (photo path + fallback)
+│       ├── calculator.py      # pure Python financial math
+│       ├── health_calculator.py  # pure Python health scoring
+│       ├── analyzer.py        # shared LLM prompt executor + draft methods
+│       ├── router.py          # document classifier
+│       ├── schemas.py         # Pydantic extraction schemas
+│       ├── case_manager.py / store.py  # legacy SQLite state (flag-off fallback)
+│       └── config.py          # env config
 ├── tests/
-│   ├── __init__.py
-│   ├── conftest.py
-│   ├── test_calculator.py
-│   ├── test_extractor.py
-│   └── test_handlers.py
-├── scripts/
-│   └── verify.sh
+├── scripts/                   # run_policy_file, live_test_graph, trigger_policy_flow, seed_evals, ...
 ├── HACKATHON.md
 ├── PLAN.md
 ├── ENGINEERING.md
