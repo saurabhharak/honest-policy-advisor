@@ -1,0 +1,45 @@
+{
+  "version": 1,
+  "rows": [
+    {
+      "inputs": {
+        "extraction": {
+          "policy_name": "Optima Secure",
+          "insurer": "HDFC ERGO General Insurance",
+          "sum_insured": 1500000,
+          "annual_premium": 34526,
+          "room_rent_cap": "At Actuals",
+          "co_pay_pct": null,
+          "waiting_periods": {"accident_days": 30, "pre_existing_years": 3, "specific_disease_years": 2},
+          "sub_limits": [],
+          "exclusions": [],
+          "restoration": "unlimited"
+        },
+        "findings": [
+          {"source": "https://joinditto.in/articles/health-insurance/how-to-choose-health-insurance/", "claim": "recommended sum insured 10-25 lakhs", "url": "https://joinditto.in/articles/health-insurance/how-to-choose-health-insurance/"}
+        ]
+      },
+      "echo": {"expected_verdict": "GOOD"},
+      "expected_verdict": "GOOD"
+    },
+    {
+      "inputs": {
+        "extraction": {
+          "policy_name": "Care Supreme",
+          "insurer": "Care Health Insurance",
+          "sum_insured": 500000,
+          "annual_premium": 9000,
+          "room_rent_cap": "no cap",
+          "co_pay_pct": 30,
+          "waiting_periods": {"accident_days": 30, "pre_existing_years": 4, "specific_disease_years": 2},
+          "sub_limits": ["ICU cap 100000"],
+          "exclusions": [],
+          "restoration": "none"
+        },
+        "findings": []
+      },
+      "echo": {"expected_verdict": "REVIEW"},
+      "expected_verdict": "REVIEW"
+    }
+  ]
+}

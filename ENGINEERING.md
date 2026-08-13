@@ -43,6 +43,7 @@ GOOD: calculator.xirr(cash_flows) → 0.038 → passed to LLM for the report
 | `calculator.py` / `health_calculator.py` | Pure financial math (incl. shared `life_calc`) | LLM calls, state |
 | `case_manager.py` / `store.py` | Legacy SQLite state machine (flag-off fallback) | Send messages, call LLM |
 | `guardrails.py` | Input/output safety rails | Anything else |
+| `evals/` | Opik evaluation harness (datasets, tasks, metrics) | Do math, generate content |
 | `opik_tracing.py` / `logging.py` | Observability | Business logic |
 | `prompts.py` | Prompt templates (incl. memory extraction/merge) | Any logic at all |
 | `config.py` | Environment variables | Anything else |
@@ -132,6 +133,17 @@ Silent failures kill demos. Loud, honest failures get fixed before the demo.
 
 - **Opik** (opt-in): every LLM call traced with inputs/outputs/model; one trace per message with nested spans per agent.
 - **Structured logging**: every record carries the conversation's correlation ID via a contextvar; third-party loggers are tolerated by `SafeFormatter`.
+
+## Evaluation harness (`evals/`)
+
+Each agent is scored against a labeled gold dataset via Opik's `evaluate()`. Deterministic metrics run always (free); an LLM judge runs only with `--live`.
+
+- **Datasets** are gold JSON files under `evals/data/` (`{"version": N, "rows": [...]}`). Seeding does `clear()` + `insert()` so the dataset is pinned to the current gold (Opik dedupes by content hash — plain inserts accumulate stale rows across gold edits).
+- **Tasks** wrap async agents for Opik's sync `ThreadPoolExecutor`: each task creates a fresh `asyncio` loop (never reuse a loop across threads) and builds agents inside it so OpenAI/httpx clients belong to that loop.
+- **Docling cache** (`evals/data/docling_cache/`): pre-parsed PDF results so the metric loop never re-runs Docling/OCR. Populated by `scripts/seed_evals.py`.
+- **Metrics** are deterministic by default (`NormalizedFieldAccuracy` with currency/alias normalization, `WhitelistEnforcement`, `RequiredFieldsPresent`, `ShortCircuitCorrectness`, gates). The LLM judge (`RobustLLMJudge`) prompts for JSON and parses tolerantly — it never depends on provider `response_format` support (Featherless returns content in `reasoning`).
+- **CLI**: `uv run python -m policydecoder.evals.run_all --agent X [--live]` or `--all`.
+- Deterministic metrics gate CI; judge scores are advisory.
 
 ## Tests are written first
 

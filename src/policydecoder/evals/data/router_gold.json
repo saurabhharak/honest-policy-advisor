@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "rows": [
+    {
+      "inputs": {
+        "input_path": "insurance_policies/hdfc_term_term_2.pdf",
+        "fallback_text": "term insurance plan with death benefit and sum assured"
+      },
+      "echo": {"expected_label": "TERM"},
+      "expected_label": "TERM"
+    },
+    {
+      "inputs": {
+        "input_path": "insurance_policies/bajaj_health_health_1.pdf",
+        "fallback_text": "health insurance with sum insured, room rent, co-pay"
+      },
+      "echo": {"expected_label": "HEALTH"},
+      "expected_label": "HEALTH"
+    },
+    {
+      "inputs": {
+        "input_path": "insurance_policies/hdfc_savings_endowment_1.pdf",
+        "fallback_text": "endowment policy with surrender value and maturity benefit"
+      },
+      "echo": {"expected_label": "LIFE"},
+      "expected_label": "LIFE"
+    }
+  ]
+}

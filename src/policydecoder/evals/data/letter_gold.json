@@ -1,0 +1,39 @@
+{
+  "version": 1,
+  "rows": [
+    {
+      "inputs": {
+        "letter_type": "complaint",
+        "policy_data": {
+          "policy_name": "LIC Jeevan Anand",
+          "insurer": "LIC",
+          "annual_premium": 50000,
+          "policy_type": "endowment",
+          "policy_start_date": "2021-01-01"
+        },
+        "analysis": {
+          "is_likely_missold": true,
+          "misselling_reasons": ["Endowment plan sold as investment", "XIRR below 5%"],
+          "_calc_results": {"xirr": 0.038}
+        }
+      },
+      "echo": {},
+      "must_contain": ["LIC Jeevan Anand", "LIC", "mis-sold", "grievance"]
+    },
+    {
+      "inputs": {
+        "letter_type": "free_look",
+        "policy_data": {
+          "policy_name": "Optima Secure",
+          "insurer": "HDFC ERGO General Insurance",
+          "annual_premium": 34526,
+          "policy_start_date": "2026-02-02",
+          "free_look_period_days": 30
+        },
+        "analysis": {"summary": "within free-look period"}
+      },
+      "echo": {},
+      "must_contain": ["Optima Secure", "HDFC ERGO", "free-look", "cancel"]
+    }
+  ]
+}

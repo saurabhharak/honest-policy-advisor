@@ -1,0 +1,39 @@
+{
+  "version": 3,
+  "rows": [
+    {
+      "inputs": {
+        "input_path": "insurance_policies/bajaj_health_health_1.pdf",
+        "media_urls": [],
+        "document_type": "HEALTH"
+      },
+      "echo": {"short_circuited": true},
+      "reference": {},
+      "short_circuited": true
+    },
+    {
+      "inputs": {
+        "input_path": "insurance_policies/hdfc_savings_endowment_1.pdf",
+        "media_urls": [],
+        "document_type": "LIFE"
+      },
+      "echo": {"short_circuited": true},
+      "reference": {},
+      "short_circuited": true
+    },
+    {
+      "inputs": {
+        "input_path": "insurance_policies/hdfc_term_term_2.pdf",
+        "media_urls": [],
+        "document_type": "LIFE"
+      },
+      "echo": {"short_circuited": true},
+      "reference": {
+        "policy_name": "HDFC Life Guaranteed Income Insurance Plan",
+        "insurer": "HDFC Life Insurance Company Limited",
+        "free_look_period_days": 30
+      },
+      "short_circuited": true
+    }
+  ]
+}

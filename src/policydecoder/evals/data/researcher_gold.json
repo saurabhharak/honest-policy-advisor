@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "rows": [
+    {
+      "inputs": {"topic": "how_to_choose_health"},
+      "echo": {},
+      "expected_domains": ["joinditto.in"]
+    },
+    {
+      "inputs": {"topic": "how_to_choose_term"},
+      "echo": {},
+      "expected_domains": ["joinditto.in"]
+    },
+    {
+      "inputs": {"topic": "irdai_report"},
+      "echo": {},
+      "expected_domains": ["irdai.gov.in"]
+    }
+  ]
+}

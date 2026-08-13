@@ -1,0 +1,67 @@
+{
+  "version": 1,
+  "rows": [
+    {
+      "inputs": {
+        "extraction": {
+          "policy_name": "LIC Jeevan Anand",
+          "insurer": "LIC",
+          "policy_type": "endowment",
+          "annual_premium": 50000,
+          "premium_term_years": 15,
+          "policy_term_years": 15,
+          "sum_assured": 1000000,
+          "maturity_value_at_8pct": 1120000,
+          "maturity_value_at_4pct": 780000
+        },
+        "calc_results": {
+          "xirr": 0.038,
+          "term_sip_value": 2000000,
+          "policy_maturity": 1120000,
+          "opportunity_cost": 880000,
+          "term_cost": 15000,
+          "premiums_paid": 750000,
+          "surrender_value": 225000,
+          "surrender_loss": 525000,
+          "user_age": 30,
+          "days_since_purchase": 3650,
+          "free_look_days": 15
+        },
+        "findings": []
+      },
+      "echo": {"expected_missold": true},
+      "expected_missold": true
+    },
+    {
+      "inputs": {
+        "extraction": {
+          "policy_name": "HDFC Term Shield",
+          "insurer": "HDFC Life",
+          "policy_type": "term",
+          "annual_premium": 18000,
+          "premium_term_years": 20,
+          "policy_term_years": 20,
+          "sum_assured": 10000000,
+          "maturity_value_at_8pct": null,
+          "maturity_value_at_4pct": null
+        },
+        "calc_results": {
+          "xirr": 0.0,
+          "term_sip_value": 0.0,
+          "policy_maturity": 0.0,
+          "opportunity_cost": 0.0,
+          "term_cost": 0.0,
+          "premiums_paid": 0,
+          "surrender_value": 0,
+          "surrender_loss": 0,
+          "user_age": 30,
+          "days_since_purchase": 0,
+          "free_look_days": 15
+        },
+        "findings": []
+      },
+      "echo": {"expected_missold": false},
+      "expected_missold": false
+    }
+  ]
+}
